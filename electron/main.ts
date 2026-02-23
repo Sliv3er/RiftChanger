@@ -3,40 +3,32 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { AssetService } from './services/assetService';
 import { GameDetector } from './services/gameDetector';
-import { CslolService } from './services/cslolService';
 import { BackupService } from './services/backupService';
 import { SkinGenerator } from './services/skinGenerator';
 import { SkinScanner } from './services/skinScanner';
+import { InjectorService } from './services/injectorService';
 
 let mainWindow: BrowserWindow | null = null;
 let assetService: AssetService;
 let gameDetector: GameDetector;
-let cslolService: CslolService;
 let backupService: BackupService;
 let skinGenerator: SkinGenerator;
 let skinScanner: SkinScanner;
+let injector: InjectorService;
 
 const isDev = !app.isPackaged;
-
-// In dev, lol-skins lives in the project. In production, next to the exe.
 const LOL_SKINS_DIR = isDev
   ? path.join(__dirname, '..', 'lol-skins')
   : path.join(path.dirname(app.getPath('exe')), 'lol-skins');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1100,
-    minHeight: 700,
-    frame: false,
-    backgroundColor: '#010A13',
+    width: 1400, height: 900, minWidth: 1100, minHeight: 700,
+    frame: false, backgroundColor: '#010A13',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
+      contextIsolation: true, nodeIntegration: false,
     },
-    icon: path.join(__dirname, '../public/icon.png'),
   });
 
   if (isDev) {
@@ -49,22 +41,17 @@ function createWindow() {
 }
 
 function initServices() {
-  const userDataPath = app.getPath('userData');
-  const cachePath = path.join(userDataPath, 'cache');
-  const backupPath = path.join(userDataPath, 'backups');
-
-  assetService = new AssetService(cachePath);
+  const ud = app.getPath('userData');
+  assetService = new AssetService(path.join(ud, 'cache'));
   gameDetector = new GameDetector();
-  cslolService = new CslolService(userDataPath);
-  backupService = new BackupService(backupPath);
+  backupService = new BackupService(path.join(ud, 'backups'));
   skinGenerator = new SkinGenerator(LOL_SKINS_DIR);
   skinScanner = new SkinScanner();
-
+  injector = new InjectorService(ud);
   fs.mkdirSync(LOL_SKINS_DIR, { recursive: true });
 }
 
 function registerIPC() {
-  // Window
   ipcMain.on('window:minimize', () => mainWindow?.minimize());
   ipcMain.on('window:maximize', () => {
     if (mainWindow?.isMaximized()) mainWindow.unmaximize();
@@ -72,65 +59,37 @@ function registerIPC() {
   });
   ipcMain.on('window:close', () => mainWindow?.close());
 
-  // ─── SKINS PATH ───
-  ipcMain.handle('skins:getPath', () => LOL_SKINS_DIR);
+  // Data
+  ipcMain.handle('getSkinsPath', () => LOL_SKINS_DIR);
+  ipcMain.handle('scan', (_e, p?: string) => skinScanner.scan(p || LOL_SKINS_DIR));
+  ipcMain.handle('getChampions', () => assetService.getChampions());
+  ipcMain.handle('getChampionSkins', (_e, id: string) => assetService.getChampionSkins(id));
+  ipcMain.handle('getPatch', () => assetService.getCurrentPatch());
+  ipcMain.handle('detectGame', () => gameDetector.detect());
 
-  // ─── SCAN ───
-  ipcMain.handle('skins:scan', async (_e, skinsPath?: string) => {
-    return skinScanner.scan(skinsPath || LOL_SKINS_DIR);
-  });
+  // Injector
+  ipcMain.handle('injector:isReady', () => injector.isReady());
+  ipcMain.handle('injector:setup', () => injector.setup());
+  ipcMain.handle('injector:import', (_e, zipPath: string, modName: string) => injector.importMod(zipPath, modName));
+  ipcMain.handle('injector:apply', (_e, modNames?: string[]) => injector.apply(modNames));
+  ipcMain.handle('injector:stop', () => { injector.stopOverlay(); return { success: true }; });
+  ipcMain.handle('injector:listMods', () => injector.listMods());
+  ipcMain.handle('injector:removeMod', (_e, name: string) => injector.removeMod(name));
+  ipcMain.handle('injector:removeAll', () => { injector.removeAllMods(); return true; });
 
-  // ─── APPLY ───
-  ipcMain.handle('skins:apply', async (_e, zipPath: string, skinName: string, champName: string) => {
-    if (!cslolService.isReady()) {
-      const setup = await cslolService.setup();
-      if (!setup.success) return { success: false, message: 'CSLoL not ready: ' + setup.message };
-    }
-    return cslolService.applySingle(zipPath, skinName, champName);
-  });
+  // Generator
+  ipcMain.handle('gen:champion', (_e, id: string) =>
+    skinGenerator.generateChampion(id, m => mainWindow?.webContents.send('gen:progress', m)));
+  ipcMain.handle('gen:all', () =>
+    skinGenerator.generateAll(p => mainWindow?.webContents.send('gen:allProgress', p)));
 
-  // ─── ASSETS ───
-  ipcMain.handle('assets:getChampions', () => assetService.getChampions());
-  ipcMain.handle('assets:getChampionSkins', (_e, id: string) => assetService.getChampionSkins(id));
-  ipcMain.handle('assets:getCurrentPatch', () => assetService.getCurrentPatch());
-
-  // ─── GAME ───
-  ipcMain.handle('game:detect', () => gameDetector.detect());
-
-  // ─── CSLOL ───
-  ipcMain.handle('cslol:setup', () => cslolService.setup());
-  ipcMain.handle('cslol:isReady', () => cslolService.isReady());
-  ipcMain.handle('cslol:launch', () => cslolService.launchManager());
-  ipcMain.handle('cslol:listInstalled', () => cslolService.listInstalled());
-  ipcMain.handle('cslol:removeAll', () => cslolService.removeAll());
-  ipcMain.handle('cslol:removeSkin', (_e, name: string) => cslolService.removeSkin(name));
-
-  // ─── GENERATOR ───
-  ipcMain.handle('gen:champion', async (_e, champId: string) => {
-    return skinGenerator.generateChampion(champId, (msg) => {
-      mainWindow?.webContents.send('gen:progress', msg);
-    });
-  });
-  ipcMain.handle('gen:all', async () => {
-    return skinGenerator.generateAll((progress) => {
-      mainWindow?.webContents.send('gen:allProgress', progress);
-    });
-  });
-
-  // ─── BACKUP ───
-  ipcMain.handle('backup:create', (_e, gamePath: string) => backupService.create(gamePath));
-  ipcMain.handle('backup:restore', (_e, id: string, gamePath: string) => backupService.restore(id, gamePath));
-  ipcMain.handle('backup:list', () => backupService.list());
-
-  // ─── DIALOG ───
-  ipcMain.handle('dialog:selectFolder', async () => {
+  ipcMain.handle('selectFolder', async () => {
     const r = await dialog.showOpenDialog(mainWindow!, { properties: ['openDirectory'] });
     return r.canceled ? null : r.filePaths[0];
   });
-
-  ipcMain.on('shell:openExternal', (_e, url: string) => shell.openExternal(url));
 }
 
 app.whenReady().then(() => { initServices(); registerIPC(); createWindow(); });
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (!mainWindow) createWindow(); });
+app.on('before-quit', () => { injector?.stopOverlay(); });

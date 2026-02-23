@@ -1,357 +1,119 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ═══════════════════════════════════════════
-   ROOT VARIABLES
-   ═══════════════════════════════════════════ */
 :root {
-  --gold: #C8AA6E;
-  --gold-bright: #C89B3C;
-  --gold-light: #F0E6D2;
-  --gold-dark: #785A28;
-  --blue-darkest: #010A13;
-  --blue-darker: #0A1428;
-  --blue-deep: #0A323C;
-  --blue-medium: #0397AB;
-  --blue-light: #0AC8B9;
-  --grey-dark: #1E2328;
-  --grey: #3C3C41;
-  --grey-light: #A09B8C;
+  --gold: #C8AA6E; --gold-bright: #C89B3C; --gold-light: #F0E6D2; --gold-dark: #785A28;
+  --blue-dark: #010A13; --blue-deeper: #0A1428; --blue-deep: #0A323C;
+  --blue-medium: #0397AB; --blue-light: #0AC8B9;
 }
 
-/* ═══════════════════════════════════════════
-   BASE
-   ═══════════════════════════════════════════ */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #root {
-  height: 100%;
-  overflow: hidden;
-  background: var(--blue-darkest);
-  color: var(--gold-light);
-  font-family: 'Inter', 'Spiegel', system-ui, sans-serif;
-  font-size: 14px;
+  height: 100%; overflow: hidden;
+  background: #010A13; color: #F0E6D2;
+  font-family: 'Inter', system-ui, sans-serif; font-size: 13px;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Hex grid background pattern */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse at 20% 50%, rgba(10, 50, 60, 0.4) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(0, 90, 130, 0.15) 0%, transparent 50%),
-    repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 60deg, rgba(200, 170, 110, 0.015) 60deg 120deg) 0 0 / 60px 60px;
-  pointer-events: none;
-  z-index: 0;
-}
+.font-beaufort { font-family: 'Cinzel', serif; letter-spacing: 0.05em; }
 
-/* ═══════════════════════════════════════════
-   SCROLLBAR
-   ═══════════════════════════════════════════ */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: rgba(10, 20, 40, 0.5);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--gold-dark);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--gold);
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #785A28; border-radius: 2px; }
 
-/* ═══════════════════════════════════════════
-   TYPOGRAPHY
-   ═══════════════════════════════════════════ */
-.font-beaufort {
-  font-family: 'Cinzel', 'Beaufort for LOL', serif;
-  letter-spacing: 0.05em;
-}
-
-h1, h2, h3 {
-  font-family: 'Cinzel', 'Beaufort for LOL', serif;
-  letter-spacing: 0.05em;
-}
-
-/* ═══════════════════════════════════════════
-   LEAGUE BUTTONS
-   ═══════════════════════════════════════════ */
-@layer components {
-  .btn-primary {
-    @apply relative px-6 py-2.5 font-beaufort font-semibold text-sm uppercase tracking-wider
-           text-league-blue-darkest bg-gradient-to-b from-league-gold-bright to-league-gold-dark
-           border border-league-gold/60 cursor-pointer
-           transition-all duration-200 ease-out;
-    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-  }
-  .btn-primary:hover {
-    @apply from-league-gold-vivid to-league-gold-bright shadow-gold-lg;
-    transform: translateY(-1px);
-  }
-  .btn-primary:active {
-    @apply from-league-gold-dark to-league-gold-dark;
-    transform: translateY(0);
-  }
-  .btn-primary:disabled {
-    @apply opacity-50 cursor-not-allowed;
-    transform: none;
-  }
-
-  .btn-secondary {
-    @apply relative px-5 py-2 font-beaufort font-semibold text-xs uppercase tracking-wider
-           text-league-gold border border-league-gold/30 bg-league-blue-darker/80
-           cursor-pointer transition-all duration-200;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-  }
-  .btn-secondary:hover {
-    @apply border-league-gold/70 bg-league-gold/10 text-league-gold-light shadow-gold;
-  }
-  .btn-secondary:disabled {
-    @apply opacity-40 cursor-not-allowed;
-  }
-
-  .btn-danger {
-    @apply relative px-5 py-2 font-beaufort font-semibold text-xs uppercase tracking-wider
-           text-league-red border border-league-red/30 bg-league-red-dark/20
-           cursor-pointer transition-all duration-200;
-  }
-  .btn-danger:hover {
-    @apply border-league-red/70 bg-league-red-dark/40;
-  }
-
-  /* ═══════════════════════════════════════════
-     CARDS
-     ═══════════════════════════════════════════ */
-  .league-card {
-    @apply relative bg-gradient-to-b from-league-grey-cool to-league-blue-darker
-           border border-league-grey-dark/80 transition-all duration-300;
-    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
-  }
-  .league-card:hover {
-    @apply border-league-gold/50 shadow-card-hover;
-  }
-  .league-card::after {
-    content: '';
-    @apply absolute inset-0 opacity-0 transition-opacity duration-300 pointer-events-none;
-    background: linear-gradient(135deg, rgba(200, 170, 110, 0.08) 0%, transparent 50%);
-  }
-  .league-card:hover::after {
-    @apply opacity-100;
-  }
-
-  .league-card-gold {
-    @apply league-card border-league-gold/40;
-  }
-  .league-card-gold:hover {
-    @apply border-league-gold/80 shadow-gold-lg;
-  }
-
-  /* ═══════════════════════════════════════════
-     INPUTS
-     ═══════════════════════════════════════════ */
-  .league-input {
-    @apply w-full px-4 py-2.5 bg-league-blue-darkest/80 border border-league-grey-dark
-           text-league-gold-light text-sm placeholder-league-grey-lightest/50
-           outline-none transition-all duration-200;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-  }
-  .league-input:focus {
-    @apply border-league-gold/60 shadow-inner-gold;
-  }
-
-  /* ═══════════════════════════════════════════
-     DIVIDERS
-     ═══════════════════════════════════════════ */
-  .league-divider {
-    @apply relative flex items-center justify-center my-6;
-  }
-  .league-divider::before,
-  .league-divider::after {
-    content: '';
-    @apply flex-1 h-px;
-    background: linear-gradient(90deg, transparent, var(--gold-dark), transparent);
-  }
-  .league-divider-diamond {
-    @apply w-2 h-2 mx-3 rotate-45 bg-league-gold-dark border border-league-gold/50;
-  }
-
-  /* ═══════════════════════════════════════════
-     PROGRESS BAR
-     ═══════════════════════════════════════════ */
-  .league-progress {
-    @apply relative w-full h-2 bg-league-grey-dark overflow-hidden;
-    clip-path: polygon(4px 0, 100% 0, 100% 100%, 0 100%, 0 4px);
-  }
-  .league-progress-fill {
-    @apply h-full transition-all duration-500 ease-out relative;
-    background: linear-gradient(90deg, var(--gold-dark), var(--gold-bright), var(--gold));
-  }
-  .league-progress-fill::after {
-    content: '';
-    @apply absolute inset-0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 2s ease-in-out infinite;
-    background-size: 200% 100%;
-  }
-
-  .league-progress-lg {
-    @apply relative w-full h-4 bg-league-grey-dark overflow-hidden border border-league-grey-lightest/30;
-    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-  }
-
-  /* ═══════════════════════════════════════════
-     BADGES
-     ═══════════════════════════════════════════ */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase;
-  }
-  .badge-gold {
-    @apply badge text-league-blue-darkest bg-league-gold;
-  }
-  .badge-blue {
-    @apply badge text-white bg-league-blue-accent;
-  }
-  .badge-green {
-    @apply badge text-white bg-league-green;
-  }
-  .badge-red {
-    @apply badge text-white bg-league-red;
-  }
-  .badge-dark {
-    @apply badge text-league-grey-light bg-league-grey-dark border border-league-grey-lightest/30;
-  }
-
-  /* ═══════════════════════════════════════════
-     SECTION HEADERS
-     ═══════════════════════════════════════════ */
-  .section-header {
-    @apply flex items-center gap-4 mb-4;
-  }
-  .section-header h2 {
-    @apply font-beaufort text-lg text-league-gold tracking-widest uppercase whitespace-nowrap;
-  }
-  .section-header::after {
-    content: '';
-    @apply flex-1 h-px;
-    background: linear-gradient(90deg, var(--gold-dark), transparent);
-  }
-
-  /* ═══════════════════════════════════════════
-     STAT CARD
-     ═══════════════════════════════════════════ */
-  .stat-card {
-    @apply league-card p-5 text-center;
-  }
-  .stat-card .stat-icon {
-    @apply text-2xl mb-2;
-  }
-  .stat-card .stat-value {
-    @apply font-beaufort text-3xl text-league-gold-bright font-bold;
-  }
-  .stat-card .stat-label {
-    @apply text-xs text-league-grey-light uppercase tracking-widest mt-1;
-  }
-
-  /* ═══════════════════════════════════════════
-     LOADING SPINNER
-     ═══════════════════════════════════════════ */
-  .league-spinner {
-    @apply w-8 h-8 border-2 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
-  }
-  .league-spinner-lg {
-    @apply w-12 h-12 border-4 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
-  }
-
-  /* ═══════════════════════════════════════════
-     TOOLTIP
-     ═══════════════════════════════════════════ */
-  .league-tooltip {
-    @apply absolute z-50 px-3 py-1.5 text-xs text-league-gold-light bg-league-blue-darkest
-           border border-league-gold-dark/50 shadow-lg pointer-events-none;
-  }
-
-  /* ═══════════════════════════════════════════
-     SEARCH
-     ═══════════════════════════════════════════ */
-  .league-search {
-    @apply relative;
-  }
-  .league-search input {
-    @apply league-input pl-10;
-  }
-  .league-search-icon {
-    @apply absolute left-3 top-1/2 -translate-y-1/2 text-league-grey-lightest text-sm pointer-events-none;
-  }
-
-  /* ═══════════════════════════════════════════
-     NAV ITEM
-     ═══════════════════════════════════════════ */
-  .nav-item {
-    @apply relative flex items-center gap-3 px-4 py-3 cursor-pointer
-           text-league-grey-light transition-all duration-200;
-  }
-  .nav-item:hover {
-    @apply text-league-gold-light bg-league-gold/5;
-  }
-  .nav-item.active {
-    @apply text-league-gold bg-league-gold/10;
-  }
-  .nav-item.active::before {
-    content: '';
-    @apply absolute left-0 top-1 bottom-1 w-0.5 bg-league-gold;
-  }
-  .nav-item .nav-icon {
-    @apply text-lg flex-shrink-0 w-6 text-center;
-  }
-  .nav-item .nav-label {
-    @apply text-sm font-medium whitespace-nowrap overflow-hidden;
-  }
-}
-
-/* ═══════════════════════════════════════════
-   ANIMATIONS
-   ═══════════════════════════════════════════ */
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-
-.gold-shimmer {
-  background: linear-gradient(90deg, var(--gold-dark), var(--gold-bright), var(--gold), var(--gold-bright), var(--gold-dark));
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: shimmer 3s ease-in-out infinite;
-}
+/* Titlebar drag */
+.drag-region { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
 
 /* Selection */
-::selection {
-  background: rgba(200, 170, 110, 0.3);
-  color: var(--gold-light);
+::selection { background: rgba(200,170,110,0.3); }
+
+@layer components {
+  /* LOCK IN button - the big one */
+  .btn-lockin {
+    @apply relative px-10 py-3 font-beaufort font-bold text-base uppercase tracking-[0.3em]
+           text-league-blue-darkest cursor-pointer transition-all duration-300;
+    background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  }
+  .btn-lockin:hover {
+    background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%);
+    box-shadow: 0 0 30px rgba(200,170,110,0.5);
+    transform: scale(1.02);
+  }
+  .btn-lockin:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-gold {
+    @apply px-4 py-2 font-beaufort text-xs uppercase tracking-widest
+           text-league-blue-darkest cursor-pointer transition-all;
+    background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
+  }
+  .btn-gold:hover { background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%); }
+
+  .btn-dark {
+    @apply px-4 py-1.5 text-xs uppercase tracking-wider
+           text-league-gold border border-league-gold/30 bg-transparent cursor-pointer transition-all;
+  }
+  .btn-dark:hover { @apply border-league-gold/60 bg-league-gold/10; }
+
+  /* Champ select grid item */
+  .champ-cell {
+    @apply relative cursor-pointer transition-all duration-200 overflow-hidden;
+    border: 1px solid transparent;
+  }
+  .champ-cell:hover { border-color: rgba(200,170,110,0.6); z-index: 1; transform: scale(1.08); }
+  .champ-cell.selected { border-color: #C89B3C; box-shadow: 0 0 12px rgba(200,170,110,0.4); z-index: 2; }
+  .champ-cell.dimmed { opacity: 0.35; filter: grayscale(0.5); }
+  .champ-cell.dimmed:hover { opacity: 0.8; filter: none; }
+
+  /* Skin card in the bottom strip */
+  .skin-thumb {
+    @apply relative cursor-pointer transition-all duration-300 flex-shrink-0 overflow-hidden;
+    border: 2px solid transparent;
+  }
+  .skin-thumb:hover { border-color: rgba(200,170,110,0.5); }
+  .skin-thumb.active { border-color: #C89B3C; box-shadow: 0 0 15px rgba(200,170,110,0.3); }
+
+  /* Chroma dot */
+  .chroma-dot {
+    @apply w-5 h-5 rounded-full cursor-pointer border-2 border-transparent transition-all;
+  }
+  .chroma-dot:hover { @apply border-white/60 scale-110; }
+  .chroma-dot.active { @apply border-league-gold scale-110; box-shadow: 0 0 8px rgba(200,170,110,0.5); }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply relative w-full h-1.5 bg-league-grey-dark overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full transition-all duration-500;
+    background: linear-gradient(90deg, #785A28, #C89B3C, #C8AA6E);
+  }
+
+  /* Tab style nav */
+  .nav-tab {
+    @apply px-5 py-2 text-xs font-beaufort uppercase tracking-[0.2em] cursor-pointer
+           transition-all border-b-2 border-transparent text-league-grey-light;
+  }
+  .nav-tab:hover { @apply text-league-gold/80 border-league-gold/30; }
+  .nav-tab.active { @apply text-league-gold border-league-gold bg-league-gold/5; }
 }
 
-/* Focus visible */
-:focus-visible {
-  outline: 1px solid var(--gold);
-  outline-offset: 2px;
-}
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
 
-/* Draggable titlebar region */
-.drag-region {
-  -webkit-app-region: drag;
+/* Gold shimmer text */
+.gold-shimmer {
+  background: linear-gradient(90deg, #785A28, #C89B3C, #C8AA6E, #C89B3C, #785A28);
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: shimmer 3s ease-in-out infinite;
 }
-.no-drag {
-  -webkit-app-region: no-drag;
-}
+@keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
