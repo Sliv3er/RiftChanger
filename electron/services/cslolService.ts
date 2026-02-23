@@ -1,207 +1,136 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn, execSync } from 'child_process';
+import { spawn } from 'child_process';
 import axios from 'axios';
 import AdmZip from 'adm-zip';
-import { SkinEntry } from './skinScanner';
 
 const CSLOL_RELEASES_API = 'https://api.github.com/repos/LeagueToolkit/cslol-manager/releases/latest';
-
-export interface CslolProfile {
-  name: string;
-  mods: string[];
-}
 
 export class CslolService {
   private basePath: string;
   private cslolDir: string;
   private modsDir: string;
-  private profilesDir: string;
 
   constructor(basePath: string) {
     this.basePath = basePath;
     this.cslolDir = path.join(basePath, 'cslol-manager');
     this.modsDir = path.join(this.cslolDir, 'installed');
-    this.profilesDir = path.join(this.cslolDir, 'profiles');
   }
 
   isReady(): boolean {
-    const exe = this.findExecutable();
-    return exe !== null;
+    return this.findExecutable() !== null;
   }
 
   private findExecutable(): string | null {
-    // CSLoL Manager ships as a portable exe or in a zip with subdirectories
-    const candidates = [
-      path.join(this.cslolDir, 'cslol-manager.exe'),
-      // May be nested in a subdirectory after extraction
-    ];
+    if (!fs.existsSync(this.cslolDir)) return null;
 
-    // Also search one level deep
-    if (fs.existsSync(this.cslolDir)) {
+    // Search recursively for cslol-manager.exe, prefer the one inside a subdirectory
+    // (the root-level one is often the self-extracting archive)
+    const found: { path: string; depth: number; size: number }[] = [];
+
+    const walk = (dir: string, depth: number) => {
+      if (depth > 3) return;
       try {
-        const entries = fs.readdirSync(this.cslolDir, { withFileTypes: true });
-        for (const e of entries) {
-          if (e.isDirectory()) {
-            const nested = path.join(this.cslolDir, e.name, 'cslol-manager.exe');
-            candidates.push(nested);
-          }
-          if (e.isFile() && e.name === 'cslol-manager.exe') {
-            return path.join(this.cslolDir, e.name);
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isFile() && entry.name === 'cslol-manager.exe') {
+            found.push({ path: full, depth, size: fs.statSync(full).size });
+          } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            walk(full, depth + 1);
           }
         }
       } catch {}
-    }
+    };
 
-    for (const c of candidates) {
-      if (fs.existsSync(c)) return c;
-    }
-    return null;
+    walk(this.cslolDir, 0);
+    if (found.length === 0) return null;
+
+    // Prefer the SMALLEST exe (real app ~28MB) over the self-extracting archive (~36MB)
+    found.sort((a, b) => a.size - b.size);
+    return found[0].path;
   }
 
   async setup(): Promise<{ success: boolean; message: string; exePath?: string }> {
     try {
       fs.mkdirSync(this.cslolDir, { recursive: true });
       fs.mkdirSync(this.modsDir, { recursive: true });
-      fs.mkdirSync(this.profilesDir, { recursive: true });
 
-      // Check if already downloaded
       const existing = this.findExecutable();
       if (existing) {
-        return { success: true, message: `CSLoL Manager already installed at ${existing}`, exePath: existing };
+        return { success: true, message: `CSLoL Manager ready: ${existing}`, exePath: existing };
       }
 
-      // Fetch latest release info
       const releaseRes = await axios.get(CSLOL_RELEASES_API, {
         headers: { 'User-Agent': 'RiftChanger/1.0' },
         timeout: 15000,
       });
 
       const assets = releaseRes.data.assets;
-      // Look for Windows zip/exe
       const winAsset = assets.find((a: any) =>
-        a.name.toLowerCase().includes('win') && 
-        (a.name.endsWith('.zip') || a.name.endsWith('.7z') || a.name.endsWith('.exe'))
-      );
+        a.name.toLowerCase().includes('win') &&
+        (a.name.endsWith('.zip') || a.name.endsWith('.exe'))
+      ) || assets.find((a: any) => a.name.endsWith('.zip'));
 
-      // If no platform-specific name, try the first zip
-      const downloadAsset = winAsset || assets.find((a: any) => a.name.endsWith('.zip'));
-
-      if (!downloadAsset) {
-        return { success: false, message: 'No compatible CSLoL Manager release found. Download manually from https://github.com/LeagueToolkit/cslol-manager/releases' };
+      if (!winAsset) {
+        return { success: false, message: 'No compatible CSLoL release found.' };
       }
 
-      const downloadPath = path.join(this.basePath, downloadAsset.name);
-
-      // Download
-      const response = await axios.get(downloadAsset.browser_download_url, {
+      const downloadPath = path.join(this.basePath, winAsset.name);
+      const response = await axios.get(winAsset.browser_download_url, {
         responseType: 'arraybuffer',
         headers: { 'User-Agent': 'RiftChanger/1.0' },
         timeout: 120000,
         maxContentLength: 500 * 1024 * 1024,
       });
-
       fs.writeFileSync(downloadPath, Buffer.from(response.data));
 
-      // Extract if zip
-      if (downloadAsset.name.endsWith('.zip')) {
+      if (winAsset.name.endsWith('.zip')) {
         const zip = new AdmZip(downloadPath);
         zip.extractAllTo(this.cslolDir, true);
         fs.unlinkSync(downloadPath);
-      } else if (downloadAsset.name.endsWith('.exe')) {
-        // It's a standalone exe, just move it
-        const destExe = path.join(this.cslolDir, 'cslol-manager.exe');
-        fs.renameSync(downloadPath, destExe);
       }
 
       const exe = this.findExecutable();
-      if (exe) {
-        return { success: true, message: `CSLoL Manager installed: ${exe}`, exePath: exe };
-      }
-
-      return { success: false, message: 'Downloaded but could not find cslol-manager.exe. Check the cslol-manager directory.' };
+      return exe
+        ? { success: true, message: `CSLoL Manager installed`, exePath: exe }
+        : { success: false, message: 'Downloaded but exe not found.' };
     } catch (e: any) {
       return { success: false, message: `Setup failed: ${e.message}` };
     }
   }
 
   /**
-   * Import fantome skin ZIPs into CSLoL's mod directory.
-   * CSLoL Manager reads .fantome files from its installed/ directory.
+   * Apply a single skin .zip as .fantome into CSLoL mods dir
    */
-  async applySkins(skins: SkinEntry[]): Promise<{ success: boolean; applied: string[]; errors: string[]; launchCslol: boolean }> {
-    const applied: string[] = [];
-    const errors: string[] = [];
-
-    fs.mkdirSync(this.modsDir, { recursive: true });
-
-    for (const skin of skins) {
-      try {
-        if (!skin.valid) {
-          errors.push(`${skin.skinName}: Invalid skin (${skin.validationErrors.join(', ')})`);
-          continue;
-        }
-
-        // CSLoL uses .fantome extension — these are just renamed zip files
-        const safeName = skin.skinName.replace(/[<>:"/\\|?*]/g, '_');
-        const destName = `${skin.championName} - ${safeName}.fantome`;
-        const destPath = path.join(this.modsDir, destName);
-
-        // Copy the zip as .fantome
-        fs.copyFileSync(skin.zipPath, destPath);
-        applied.push(skin.skinName);
-      } catch (e: any) {
-        errors.push(`${skin.skinName}: ${e.message}`);
+  applySingle(zipPath: string, skinName: string, champName: string): { success: boolean; message: string } {
+    try {
+      if (!fs.existsSync(zipPath)) {
+        return { success: false, message: `File not found: ${zipPath}` };
       }
+      fs.mkdirSync(this.modsDir, { recursive: true });
+      const safeName = `${champName} - ${skinName}`.replace(/[<>:"/\\|?*]/g, '_');
+      const dest = path.join(this.modsDir, `${safeName}.fantome`);
+      fs.copyFileSync(zipPath, dest);
+      return { success: true, message: `Imported "${skinName}". Open CSLoL Manager → click Run.` };
+    } catch (e: any) {
+      return { success: false, message: e.message };
     }
-
-    // Write a RiftChanger profile
-    this.writeProfile('RiftChanger', applied);
-
-    return {
-      success: errors.length === 0,
-      applied,
-      errors,
-      launchCslol: applied.length > 0,
-    };
   }
 
-  /**
-   * Write a profile JSON that tracks which mods are active
-   */
-  private writeProfile(name: string, modNames: string[]) {
-    fs.mkdirSync(this.profilesDir, { recursive: true });
-    const profile = {
-      name,
-      mods: modNames,
-      createdAt: new Date().toISOString(),
-    };
-    fs.writeFileSync(
-      path.join(this.profilesDir, `${name}.json`),
-      JSON.stringify(profile, null, 2)
-    );
-  }
-
-  /**
-   * Launch CSLoL Manager GUI so the user can click apply/overlay
-   */
   launchManager(): { success: boolean; message: string } {
     const exe = this.findExecutable();
-    if (!exe) {
-      return { success: false, message: 'CSLoL Manager not found. Run setup first.' };
-    }
+    if (!exe) return { success: false, message: 'CSLoL Manager not found. Run setup first.' };
 
     try {
-      // Detach the process so it runs independently
       const child = spawn(exe, [], {
         detached: true,
         stdio: 'ignore',
         cwd: path.dirname(exe),
       });
       child.unref();
-      return { success: true, message: `Launched CSLoL Manager: ${exe}` };
+      return { success: true, message: `Launched CSLoL Manager` };
     } catch (e: any) {
-      return { success: false, message: `Failed to launch: ${e.message}` };
+      return { success: false, message: `Launch failed: ${e.message}` };
     }
   }
 
@@ -209,13 +138,12 @@ export class CslolService {
     try {
       let removed = 0;
       if (fs.existsSync(this.modsDir)) {
-        const files = fs.readdirSync(this.modsDir).filter(f => f.endsWith('.fantome'));
-        for (const file of files) {
-          fs.unlinkSync(path.join(this.modsDir, file));
+        for (const f of fs.readdirSync(this.modsDir).filter(f => f.endsWith('.fantome'))) {
+          fs.unlinkSync(path.join(this.modsDir, f));
           removed++;
         }
       }
-      return { success: true, removed, message: `Removed ${removed} skins from CSLoL` };
+      return { success: true, removed, message: `Removed ${removed} mods` };
     } catch (e: any) {
       return { success: false, removed: 0, message: e.message };
     }
@@ -224,14 +152,13 @@ export class CslolService {
   removeSkin(skinName: string): { success: boolean; message: string } {
     try {
       if (fs.existsSync(this.modsDir)) {
-        const files = fs.readdirSync(this.modsDir);
-        const match = files.find(f => f.includes(skinName));
+        const match = fs.readdirSync(this.modsDir).find(f => f.includes(skinName));
         if (match) {
           fs.unlinkSync(path.join(this.modsDir, match));
           return { success: true, message: `Removed: ${match}` };
         }
       }
-      return { success: false, message: `Skin not found in installed mods: ${skinName}` };
+      return { success: false, message: `Not found: ${skinName}` };
     } catch (e: any) {
       return { success: false, message: e.message };
     }
@@ -242,11 +169,5 @@ export class CslolService {
     return fs.readdirSync(this.modsDir).filter(f => f.endsWith('.fantome'));
   }
 
-  getInstalledDir(): string {
-    return this.modsDir;
-  }
-
-  getCslolDir(): string {
-    return this.cslolDir;
-  }
+  getInstalledDir(): string { return this.modsDir; }
 }
