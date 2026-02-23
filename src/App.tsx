@@ -6,6 +6,7 @@ import ChampionDetail from './pages/ChampionDetail';
 import Settings from './pages/Settings';
 import Logs from './pages/Logs';
 import Dashboard from './pages/Dashboard';
+import Generator from './pages/Generator';
 import type { ScanResult, ChampionData, SkinEntry } from './types/api';
 
 export default function App() {
@@ -45,7 +46,7 @@ export default function App() {
       if (window.api) {
         const result = await window.api.scanSkins(path);
         setScanResult(result);
-        addLog(`Scan complete: ${result.totalSkins} skins, ${result.totalChromas} chromas, ${result.totalForms} forms, ${result.totalExalted} exalted`);
+        addLog(`Scan complete: ${result.totalSkins} skins, ${result.totalChromas} chromas`);
         const valid = result.skins.filter(s => s.valid).length;
         const invalid = result.skins.filter(s => !s.valid).length;
         addLog(`Validation: ${valid} valid, ${invalid} invalid out of ${result.skins.length} total`);
@@ -63,15 +64,9 @@ export default function App() {
     try {
       if (window.api) {
         const result = await window.api.applySkins(skins);
-        if (result.applied.length > 0) {
-          addLog(`✅ Imported: ${result.applied.join(', ')}`);
-        }
-        if (result.errors.length > 0) {
-          result.errors.forEach(e => addLog(`❌ ${e}`));
-        }
-        if (result.launchCslol) {
-          addLog('💡 Open CSLoL Manager and click "Run" to apply skins to the game.');
-        }
+        if (result.applied.length > 0) addLog(`✅ Imported: ${result.applied.join(', ')}`);
+        if (result.errors.length > 0) result.errors.forEach(e => addLog(`❌ ${e}`));
+        if (result.launchCslol) addLog('💡 Open CSLoL Manager and click "Run" to apply.');
       }
     } catch (e: any) {
       addLog(`Apply failed: ${e.message}`);
@@ -79,53 +74,24 @@ export default function App() {
   };
 
   return (
-    <Layout>
+    <Layout patch={patch}>
       <Routes>
-        <Route
-          path="/"
-          element={
-            <Dashboard
-              scanResult={scanResult}
-              patch={patch}
-              onScan={handleScan}
-              skinsPath={skinsPath}
-              addLog={addLog}
-            />
-          }
-        />
-        <Route
-          path="/champions"
-          element={
-            <Champions
-              champions={champions}
-              scanResult={scanResult}
-            />
-          }
-        />
-        <Route
-          path="/champion/:id"
-          element={
-            <ChampionDetail
-              scanResult={scanResult}
-              onApply={handleApply}
-              addLog={addLog}
-            />
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <Settings
-              skinsPath={skinsPath}
-              onScan={handleScan}
-              addLog={addLog}
-            />
-          }
-        />
-        <Route
-          path="/logs"
-          element={<Logs logs={logs} />}
-        />
+        <Route path="/" element={
+          <Dashboard scanResult={scanResult} patch={patch} onScan={handleScan} skinsPath={skinsPath} addLog={addLog} />
+        } />
+        <Route path="/champions" element={
+          <Champions champions={champions} scanResult={scanResult} />
+        } />
+        <Route path="/champion/:id" element={
+          <ChampionDetail scanResult={scanResult} onApply={handleApply} addLog={addLog} />
+        } />
+        <Route path="/generator" element={
+          <Generator skinsPath={skinsPath} addLog={addLog} />
+        } />
+        <Route path="/settings" element={
+          <Settings skinsPath={skinsPath} onScan={handleScan} addLog={addLog} />
+        } />
+        <Route path="/logs" element={<Logs logs={logs} />} />
       </Routes>
     </Layout>
   );

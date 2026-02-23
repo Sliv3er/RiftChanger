@@ -41,16 +41,23 @@ contextBridge.exposeInMainWorld('api', {
   restoreBackup: (id: string, path: string) => ipcRenderer.invoke('backup:restore', id, path),
   listBackups: () => ipcRenderer.invoke('backup:list'),
 
+  // Generator
+  generateSkin: (champId: string, skinNum: number, skinName: string) =>
+    ipcRenderer.invoke('generator:generateSkin', champId, skinNum, skinName),
+  generateChampion: (champId: string) =>
+    ipcRenderer.invoke('generator:generateChampion', champId),
+  generateAll: (outputDir?: string) =>
+    ipcRenderer.invoke('generator:generateAll', outputDir),
+  onGeneratorProgress: (cb: (msg: string) => void) => {
+    ipcRenderer.on('generator:progress', (_e, msg) => cb(msg));
+  },
+  onGeneratorAllProgress: (cb: (progress: any) => void) => {
+    ipcRenderer.on('generator:allProgress', (_e, progress) => cb(progress));
+  },
+
   // Dialog
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 
   // Shell
   openExternal: (url: string) => ipcRenderer.send('shell:openExternal', url),
-
-  // Generator
-  generateSkin: (champId: string, skinNum: number, skinName: string) => ipcRenderer.invoke('generator:generateSkin', champId, skinNum, skinName),
-  generateChampion: (champId: string) => ipcRenderer.invoke('generator:generateChampion', champId),
-  generateAll: (outputDir?: string) => ipcRenderer.invoke('generator:generateAll', outputDir),
-  onGeneratorProgress: (cb: (msg: string) => void) => ipcRenderer.on('generator:progress', (_e: any, msg: string) => cb(msg)),
-  onGeneratorAllProgress: (cb: (progress: any) => void) => ipcRenderer.on('generator:allProgress', (_e: any, progress: any) => cb(progress)),
 });

@@ -1,144 +1,357 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════
+   ROOT VARIABLES
+   ═══════════════════════════════════════════ */
+:root {
+  --gold: #C8AA6E;
+  --gold-bright: #C89B3C;
+  --gold-light: #F0E6D2;
+  --gold-dark: #785A28;
+  --blue-darkest: #010A13;
+  --blue-darker: #0A1428;
+  --blue-deep: #0A323C;
+  --blue-medium: #0397AB;
+  --blue-light: #0AC8B9;
+  --grey-dark: #1E2328;
+  --grey: #3C3C41;
+  --grey-light: #A09B8C;
+}
+
+/* ═══════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════ */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  background: var(--blue-darkest);
+  color: var(--gold-light);
+  font-family: 'Inter', 'Spiegel', system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hex grid background pattern */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(10, 50, 60, 0.4) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(0, 90, 130, 0.15) 0%, transparent 50%),
+    repeating-conic-gradient(from 0deg at 50% 50%, transparent 0deg 60deg, rgba(200, 170, 110, 0.015) 60deg 120deg) 0 0 / 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════ */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A1428;
+  background: rgba(10, 20, 40, 0.5);
 }
 ::-webkit-scrollbar-thumb {
-  background: #463714;
+  background: var(--gold-dark);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #785A28;
+  background: var(--gold);
 }
 
-body {
-  font-family: 'Spiegel', 'Segoe UI', sans-serif;
-  background: #010A13;
-  color: #A09B8C;
-  overflow: hidden;
-  user-select: none;
+/* ═══════════════════════════════════════════
+   TYPOGRAPHY
+   ═══════════════════════════════════════════ */
+.font-beaufort {
+  font-family: 'Cinzel', 'Beaufort for LOL', serif;
+  letter-spacing: 0.05em;
 }
 
-/* League-style gold border accent */
-.league-border {
-  border: 1px solid #463714;
-}
-.league-border-light {
-  border: 1px solid #785A28;
-}
-.league-border-gold {
-  border: 1px solid #C89B3C;
+h1, h2, h3 {
+  font-family: 'Cinzel', 'Beaufort for LOL', serif;
+  letter-spacing: 0.05em;
 }
 
-/* Gold text */
-.text-gold {
-  color: #C89B3C;
-}
-.text-gold-light {
-  color: #F0E6D2;
+/* ═══════════════════════════════════════════
+   LEAGUE BUTTONS
+   ═══════════════════════════════════════════ */
+@layer components {
+  .btn-primary {
+    @apply relative px-6 py-2.5 font-beaufort font-semibold text-sm uppercase tracking-wider
+           text-league-blue-darkest bg-gradient-to-b from-league-gold-bright to-league-gold-dark
+           border border-league-gold/60 cursor-pointer
+           transition-all duration-200 ease-out;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  .btn-primary:hover {
+    @apply from-league-gold-vivid to-league-gold-bright shadow-gold-lg;
+    transform: translateY(-1px);
+  }
+  .btn-primary:active {
+    @apply from-league-gold-dark to-league-gold-dark;
+    transform: translateY(0);
+  }
+  .btn-primary:disabled {
+    @apply opacity-50 cursor-not-allowed;
+    transform: none;
+  }
+
+  .btn-secondary {
+    @apply relative px-5 py-2 font-beaufort font-semibold text-xs uppercase tracking-wider
+           text-league-gold border border-league-gold/30 bg-league-blue-darker/80
+           cursor-pointer transition-all duration-200;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+  .btn-secondary:hover {
+    @apply border-league-gold/70 bg-league-gold/10 text-league-gold-light shadow-gold;
+  }
+  .btn-secondary:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply relative px-5 py-2 font-beaufort font-semibold text-xs uppercase tracking-wider
+           text-league-red border border-league-red/30 bg-league-red-dark/20
+           cursor-pointer transition-all duration-200;
+  }
+  .btn-danger:hover {
+    @apply border-league-red/70 bg-league-red-dark/40;
+  }
+
+  /* ═══════════════════════════════════════════
+     CARDS
+     ═══════════════════════════════════════════ */
+  .league-card {
+    @apply relative bg-gradient-to-b from-league-grey-cool to-league-blue-darker
+           border border-league-grey-dark/80 transition-all duration-300;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  }
+  .league-card:hover {
+    @apply border-league-gold/50 shadow-card-hover;
+  }
+  .league-card::after {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300 pointer-events-none;
+    background: linear-gradient(135deg, rgba(200, 170, 110, 0.08) 0%, transparent 50%);
+  }
+  .league-card:hover::after {
+    @apply opacity-100;
+  }
+
+  .league-card-gold {
+    @apply league-card border-league-gold/40;
+  }
+  .league-card-gold:hover {
+    @apply border-league-gold/80 shadow-gold-lg;
+  }
+
+  /* ═══════════════════════════════════════════
+     INPUTS
+     ═══════════════════════════════════════════ */
+  .league-input {
+    @apply w-full px-4 py-2.5 bg-league-blue-darkest/80 border border-league-grey-dark
+           text-league-gold-light text-sm placeholder-league-grey-lightest/50
+           outline-none transition-all duration-200;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+  .league-input:focus {
+    @apply border-league-gold/60 shadow-inner-gold;
+  }
+
+  /* ═══════════════════════════════════════════
+     DIVIDERS
+     ═══════════════════════════════════════════ */
+  .league-divider {
+    @apply relative flex items-center justify-center my-6;
+  }
+  .league-divider::before,
+  .league-divider::after {
+    content: '';
+    @apply flex-1 h-px;
+    background: linear-gradient(90deg, transparent, var(--gold-dark), transparent);
+  }
+  .league-divider-diamond {
+    @apply w-2 h-2 mx-3 rotate-45 bg-league-gold-dark border border-league-gold/50;
+  }
+
+  /* ═══════════════════════════════════════════
+     PROGRESS BAR
+     ═══════════════════════════════════════════ */
+  .league-progress {
+    @apply relative w-full h-2 bg-league-grey-dark overflow-hidden;
+    clip-path: polygon(4px 0, 100% 0, 100% 100%, 0 100%, 0 4px);
+  }
+  .league-progress-fill {
+    @apply h-full transition-all duration-500 ease-out relative;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold-bright), var(--gold));
+  }
+  .league-progress-fill::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+
+  .league-progress-lg {
+    @apply relative w-full h-4 bg-league-grey-dark overflow-hidden border border-league-grey-lightest/30;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+
+  /* ═══════════════════════════════════════════
+     BADGES
+     ═══════════════════════════════════════════ */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase;
+  }
+  .badge-gold {
+    @apply badge text-league-blue-darkest bg-league-gold;
+  }
+  .badge-blue {
+    @apply badge text-white bg-league-blue-accent;
+  }
+  .badge-green {
+    @apply badge text-white bg-league-green;
+  }
+  .badge-red {
+    @apply badge text-white bg-league-red;
+  }
+  .badge-dark {
+    @apply badge text-league-grey-light bg-league-grey-dark border border-league-grey-lightest/30;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION HEADERS
+     ═══════════════════════════════════════════ */
+  .section-header {
+    @apply flex items-center gap-4 mb-4;
+  }
+  .section-header h2 {
+    @apply font-beaufort text-lg text-league-gold tracking-widest uppercase whitespace-nowrap;
+  }
+  .section-header::after {
+    content: '';
+    @apply flex-1 h-px;
+    background: linear-gradient(90deg, var(--gold-dark), transparent);
+  }
+
+  /* ═══════════════════════════════════════════
+     STAT CARD
+     ═══════════════════════════════════════════ */
+  .stat-card {
+    @apply league-card p-5 text-center;
+  }
+  .stat-card .stat-icon {
+    @apply text-2xl mb-2;
+  }
+  .stat-card .stat-value {
+    @apply font-beaufort text-3xl text-league-gold-bright font-bold;
+  }
+  .stat-card .stat-label {
+    @apply text-xs text-league-grey-light uppercase tracking-widest mt-1;
+  }
+
+  /* ═══════════════════════════════════════════
+     LOADING SPINNER
+     ═══════════════════════════════════════════ */
+  .league-spinner {
+    @apply w-8 h-8 border-2 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
+  }
+  .league-spinner-lg {
+    @apply w-12 h-12 border-3 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
+  }
+
+  /* ═══════════════════════════════════════════
+     TOOLTIP
+     ═══════════════════════════════════════════ */
+  .league-tooltip {
+    @apply absolute z-50 px-3 py-1.5 text-xs text-league-gold-light bg-league-blue-darkest
+           border border-league-gold-dark/50 shadow-lg pointer-events-none;
+  }
+
+  /* ═══════════════════════════════════════════
+     SEARCH
+     ═══════════════════════════════════════════ */
+  .league-search {
+    @apply relative;
+  }
+  .league-search input {
+    @apply league-input pl-10;
+  }
+  .league-search-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 text-league-grey-lightest text-sm pointer-events-none;
+  }
+
+  /* ═══════════════════════════════════════════
+     NAV ITEM
+     ═══════════════════════════════════════════ */
+  .nav-item {
+    @apply relative flex items-center gap-3 px-4 py-3 cursor-pointer
+           text-league-grey-light transition-all duration-200;
+  }
+  .nav-item:hover {
+    @apply text-league-gold-light bg-league-gold/5;
+  }
+  .nav-item.active {
+    @apply text-league-gold bg-league-gold/10;
+  }
+  .nav-item.active::before {
+    content: '';
+    @apply absolute left-0 top-1 bottom-1 w-0.5 bg-league-gold;
+  }
+  .nav-item .nav-icon {
+    @apply text-lg flex-shrink-0 w-6 text-center;
+  }
+  .nav-item .nav-label {
+    @apply text-sm font-medium whitespace-nowrap overflow-hidden;
+  }
 }
 
-/* Card hover effect */
-.skin-card {
-  transition: all 0.3s ease;
-  border: 1px solid transparent;
-}
-.skin-card:hover {
-  border-color: #C89B3C;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(200, 155, 60, 0.2);
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════ */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
 }
 
-/* Button styles */
-.btn-league {
-  background: linear-gradient(180deg, #1E2328 0%, #433d2b 100%);
-  border: 1px solid #C89B3C;
-  color: #C89B3C;
-  padding: 8px 24px;
-  font-family: 'Beaufort for LOL', serif;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.btn-league:hover {
-  background: linear-gradient(180deg, #433d2b 0%, #1E2328 100%);
-  color: #F0E6D2;
-  box-shadow: 0 0 10px rgba(200, 155, 60, 0.3);
-}
-.btn-league:active {
-  transform: scale(0.98);
+.gold-shimmer {
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold-bright), var(--gold), var(--gold-bright), var(--gold-dark));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s ease-in-out infinite;
 }
 
-.btn-league-primary {
-  background: linear-gradient(180deg, #785A28 0%, #C89B3C 50%, #785A28 100%);
-  border: 1px solid #C89B3C;
-  color: #010A13;
-  padding: 10px 32px;
-  font-family: 'Beaufort for LOL', serif;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.btn-league-primary:hover {
-  filter: brightness(1.2);
-  box-shadow: 0 0 15px rgba(200, 155, 60, 0.4);
+/* Selection */
+::selection {
+  background: rgba(200, 170, 110, 0.3);
+  color: var(--gold-light);
 }
 
-/* Titlebar drag region */
-.titlebar {
+/* Focus visible */
+:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Draggable titlebar region */
+.drag-region {
   -webkit-app-region: drag;
 }
-.titlebar button {
+.no-drag {
   -webkit-app-region: no-drag;
-}
-
-/* Loading shimmer */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.shimmer {
-  background: linear-gradient(90deg, #1E2328 25%, #2a2f35 50%, #1E2328 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* Fade in */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.fade-in {
-  animation: fadeIn 0.3s ease forwards;
-}
-
-/* Search input */
-.search-input {
-  background: #1E2328;
-  border: 1px solid #463714;
-  color: #F0E6D2;
-  padding: 8px 16px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.search-input:focus {
-  border-color: #C89B3C;
-}
-.search-input::placeholder {
-  color: #5B5A56;
 }

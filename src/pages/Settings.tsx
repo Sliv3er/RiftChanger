@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface Props {
   skinsPath: string;
@@ -10,21 +10,6 @@ export default function Settings({ skinsPath, onScan, addLog }: Props) {
   const [path, setPath] = useState(skinsPath);
   const [gameInfo, setGameInfo] = useState<any>(null);
   const [backups, setBackups] = useState<any[]>([]);
-  const [genOutputDir, setGenOutputDir] = useState(skinsPath);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState<{total: number; done: number; current: string; errors: string[]; generated: number} | null>(null);
-
-  useEffect(() => {
-    setGenOutputDir(skinsPath);
-  }, [skinsPath]);
-
-  useEffect(() => {
-    if (window.api?.onGeneratorAllProgress) {
-      window.api.onGeneratorAllProgress((progress) => {
-        setGenProgress(progress);
-      });
-    }
-  }, []);
 
   const handleBrowse = async () => {
     if (window.api) {
@@ -63,47 +48,69 @@ export default function Settings({ skinsPath, onScan, addLog }: Props) {
   };
 
   return (
-    <div className="fade-in space-y-6 max-w-3xl">
-      <h1 className="font-beaufort text-3xl font-bold text-league-gold-light tracking-wide">SETTINGS</h1>
+    <div className="animate-fade-in space-y-8 max-w-3xl mx-auto">
+      <div>
+        <h1 className="font-beaufort text-3xl font-bold text-league-gold-light tracking-widest uppercase">Settings</h1>
+        <p className="text-league-grey-light text-sm mt-1">Configure your RiftChanger setup</p>
+      </div>
 
-      {/* Skins Path */}
-      <section className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-        <h2 className="font-beaufort text-lg text-league-gold">SKIN LIBRARY PATH</h2>
+      {/* ══════ LIBRARY PATH ══════ */}
+      <div className="league-card p-6 space-y-4">
+        <div className="section-header"><h2>Skin Library Path</h2></div>
         <div className="flex gap-2">
           <input
             type="text"
             value={path}
             onChange={(e) => setPath(e.target.value)}
-            className="search-input flex-1 rounded"
+            className="league-input flex-1"
             placeholder="Path to skins folder..."
           />
-          <button onClick={handleBrowse} className="btn-league text-sm">Browse</button>
+          <button onClick={handleBrowse} className="btn-secondary">Browse</button>
         </div>
-        <button onClick={() => onScan(path)} className="btn-league-primary text-sm">
+        <button onClick={() => onScan(path)} className="btn-primary text-sm">
           Save & Rescan
         </button>
-      </section>
+      </div>
 
-      {/* Game Detection */}
-      <section className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-        <h2 className="font-beaufort text-lg text-league-gold">GAME DETECTION</h2>
-        <button onClick={handleDetect} className="btn-league text-sm">Detect League of Legends</button>
+      {/* ══════ GAME DETECTION ══════ */}
+      <div className="league-card p-6 space-y-4">
+        <div className="section-header"><h2>Game Detection</h2></div>
+        <button onClick={handleDetect} className="btn-secondary">🔍 Detect League of Legends</button>
         {gameInfo && (
-          <div className="space-y-1 text-sm">
-            <p><span className="text-league-grey">Status:</span> <span className={gameInfo.found ? 'text-green-400' : 'text-red-400'}>{gameInfo.found ? 'Found' : 'Not Found'}</span></p>
-            {gameInfo.path && <p><span className="text-league-grey">Path:</span> <span className="text-league-gold-light">{gameInfo.path}</span></p>}
-            {gameInfo.version && <p><span className="text-league-grey">Version:</span> <span className="text-league-gold-light">{gameInfo.version}</span></p>}
-            <p><span className="text-league-grey">Running:</span> <span className={gameInfo.isRunning ? 'text-green-400' : 'text-league-grey'}>{gameInfo.isRunning ? 'Yes' : 'No'}</span></p>
+          <div className="space-y-2 text-sm">
+            <div className="flex gap-4">
+              <span className="text-league-grey-light">Status:</span>
+              <span className={gameInfo.found ? 'text-league-green' : 'text-league-red'}>
+                {gameInfo.found ? 'Found' : 'Not Found'}
+              </span>
+            </div>
+            {gameInfo.path && (
+              <div className="flex gap-4">
+                <span className="text-league-grey-light">Path:</span>
+                <span className="text-league-gold-light text-xs">{gameInfo.path}</span>
+              </div>
+            )}
+            {gameInfo.version && (
+              <div className="flex gap-4">
+                <span className="text-league-grey-light">Version:</span>
+                <span className="text-league-gold-light">{gameInfo.version}</span>
+              </div>
+            )}
+            <div className="flex gap-4">
+              <span className="text-league-grey-light">Running:</span>
+              <span className={gameInfo.isRunning ? 'text-league-green' : 'text-league-grey-light'}>
+                {gameInfo.isRunning ? 'Yes' : 'No'}
+              </span>
+            </div>
           </div>
         )}
-      </section>
+      </div>
 
-      {/* CSLoL Manager */}
-      <section className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-        <h2 className="font-beaufort text-lg text-league-gold">CSLOL MANAGER</h2>
-        <p className="text-league-grey text-sm">
+      {/* ══════ CSLOL ══════ */}
+      <div className="league-card p-6 space-y-4">
+        <div className="section-header"><h2>CSLoL Manager</h2></div>
+        <p className="text-league-grey-light text-sm">
           CSLoL Manager is the backend engine that applies skins to the game.
-          RiftChanger will automatically download and configure it.
         </p>
         <button
           onClick={async () => {
@@ -113,92 +120,53 @@ export default function Settings({ skinsPath, onScan, addLog }: Props) {
               addLog(result.message);
             }
           }}
-          className="btn-league text-sm"
+          className="btn-secondary"
         >
-          Download & Setup
+          📦 Download & Setup
         </button>
-      </section>
+      </div>
 
-      {/* Skin Generator */}
-      <section className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-        <h2 className="font-beaufort text-lg text-league-gold">SKIN GENERATOR</h2>
-        <p className="text-league-grey text-sm">Generate fantome mods for all champions from CDragon.</p>
+      {/* ══════ BACKUPS ══════ */}
+      <div className="league-card p-6 space-y-4">
+        <div className="section-header"><h2>Backups</h2></div>
         <div className="flex gap-2">
-          <input
-            type="text"
-            value={genOutputDir}
-            onChange={(e) => setGenOutputDir(e.target.value)}
-            className="search-input flex-1 rounded"
-            placeholder="Output directory..."
-          />
-          <button onClick={async () => {
-            if (window.api) {
-              const selected = await window.api.selectFolder();
-              if (selected) setGenOutputDir(selected);
-            }
-          }} className="btn-league text-sm">Browse</button>
-        </div>
-        <button
-          onClick={async () => {
-            if (!window.api || generating) return;
-            setGenerating(true);
-            setGenProgress(null);
-            addLog('Starting skin generation...');
-            try {
-              const result = await window.api.generateAll(genOutputDir);
-              addLog(`Done: ${result.generated} generated, ${result.errors.length} errors`);
-              setGenProgress(result);
-            } catch (e: any) {
-              addLog(`Generation failed: ${e.message}`);
-            }
-            setGenerating(false);
-          }}
-          className="btn-league-primary text-sm"
-          disabled={generating}
-        >
-          {generating ? '⏳ Generating...' : '⚡ Generate All'}
-        </button>
-        {genProgress && (
-          <div className="space-y-1">
-            <div className="w-full bg-league-grey-cool rounded-full h-2 overflow-hidden">
-              <div className="h-full bg-league-gold transition-all" style={{ width: `${genProgress.total > 0 ? (genProgress.done / genProgress.total) * 100 : 0}%` }} />
-            </div>
-            <p className="text-league-grey text-xs">{genProgress.done}/{genProgress.total} champions — {genProgress.generated} skins — {genProgress.errors.length} errors</p>
-            {genProgress.current && <p className="text-league-gold-light text-xs">{genProgress.current}</p>}
-          </div>
-        )}
-      </section>
-
-      {/* Backups */}
-      <section className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-        <h2 className="font-beaufort text-lg text-league-gold">BACKUPS</h2>
-        <div className="flex gap-2">
-          <button onClick={handleBackup} className="btn-league text-sm" disabled={!gameInfo?.path}>
+          <button onClick={handleBackup} className="btn-secondary" disabled={!gameInfo?.path}>
             Create Backup
           </button>
-          <button onClick={loadBackups} className="btn-league text-sm">
-            Refresh
-          </button>
+          <button onClick={loadBackups} className="btn-secondary">Refresh</button>
         </div>
         {backups.length > 0 && (
           <div className="space-y-2">
             {backups.map(b => (
-              <div key={b.id} className="flex items-center justify-between bg-league-grey-cool rounded p-3">
+              <div key={b.id} className="flex items-center justify-between bg-league-blue-darker/50 border border-league-grey-dark/30 p-3">
                 <div>
                   <p className="text-league-gold-light text-sm">{b.id}</p>
-                  <p className="text-league-grey text-xs">{new Date(b.date).toLocaleString()}</p>
+                  <p className="text-league-grey-light text-xs">{new Date(b.date).toLocaleString()}</p>
                 </div>
-                <button
-                  onClick={() => handleRestore(b.id)}
-                  className="btn-league text-xs"
-                >
+                <button onClick={() => handleRestore(b.id)} className="btn-secondary text-xs">
                   Restore
                 </button>
               </div>
             ))}
           </div>
         )}
-      </section>
+      </div>
+
+      {/* ══════ ABOUT ══════ */}
+      <div className="league-card p-6 space-y-3">
+        <div className="section-header"><h2>About</h2></div>
+        <div className="text-sm space-y-1">
+          <p><span className="text-league-grey-light">Version:</span> <span className="text-league-gold">1.0.0</span></p>
+          <p><span className="text-league-grey-light">Author:</span> <span className="text-league-gold-light">Sliv3er</span></p>
+          <p><span className="text-league-grey-light">License:</span> <span className="text-league-gold-light">MIT</span></p>
+        </div>
+        <div className="league-divider">
+          <div className="league-divider-diamond" />
+        </div>
+        <p className="text-league-grey-lightest text-xs text-center">
+          Powered by CDragon • CSLoL • Data Dragon
+        </p>
+      </div>
     </div>
   );
 }

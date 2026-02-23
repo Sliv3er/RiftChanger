@@ -1,57 +1,67 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: '⚡' },
-  { path: '/champions', label: 'Champions', icon: '🛡️' },
-  { path: '/settings', label: 'Settings', icon: '⚙️' },
-  { path: '/logs', label: 'Logs', icon: '📋' },
+const NAV_ITEMS = [
+  { to: '/', icon: '⬡', label: 'Home' },
+  { to: '/champions', icon: '⚔', label: 'Champions' },
+  { to: '/generator', icon: '⚙', label: 'Generator' },
+  { to: '/settings', icon: '☰', label: 'Settings' },
+  { to: '/logs', icon: '▤', label: 'Logs' },
 ];
 
-export default function Sidebar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+interface Props {
+  patch?: string;
+}
+
+export default function Sidebar({ patch }: Props) {
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="w-56 bg-league-blue-deeper border-r border-league-border flex flex-col">
+    <nav
+      className="relative flex flex-col h-full bg-league-hextech-black border-r border-league-grey-dark/50 transition-all duration-300 ease-out z-40"
+      style={{ width: expanded ? 200 : 64 }}
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+    >
       {/* Logo area */}
-      <div className="p-6 border-b border-league-border">
-        <h1 className="font-beaufort text-2xl font-bold text-league-gold tracking-wider">
-          RIFT
-        </h1>
-        <h1 className="font-beaufort text-2xl font-bold text-league-gold-light tracking-wider -mt-1">
-          CHANGER
-        </h1>
-        <p className="text-league-grey text-xs mt-1">Skin Manager</p>
+      <div className="h-14 flex items-center justify-center border-b border-league-grey-dark/30 px-3">
+        <div className="w-8 h-8 flex items-center justify-center">
+          <div className="w-5 h-5 rotate-45 border-2 border-league-gold bg-league-gold/10 transition-all duration-300"
+               style={{ boxShadow: expanded ? '0 0 12px rgba(200,170,110,0.4)' : 'none' }} />
+        </div>
+        {expanded && (
+          <span className="ml-3 font-beaufort text-sm text-league-gold tracking-[0.15em] uppercase animate-fade-in">
+            Rift
+          </span>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 py-4">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path ||
-            (item.path === '/champions' && location.pathname.startsWith('/champion'));
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={`w-full px-6 py-3 flex items-center gap-3 text-left transition-all duration-200 ${
-                isActive
-                  ? 'bg-league-grey-cool border-l-2 border-league-gold text-league-gold-light'
-                  : 'border-l-2 border-transparent text-league-grey hover:text-league-gold-light hover:bg-league-grey-cool/50'
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              <span className="font-beaufort text-sm tracking-wide uppercase">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Footer */}
-      <div className="p-4 border-t border-league-border">
-        <p className="text-league-grey-dark text-xs text-center">
-          Powered by CSLoL Manager
-        </p>
+      {/* Nav Items */}
+      <div className="flex-1 py-4 space-y-1">
+        {NAV_ITEMS.map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            {expanded && (
+              <span className="nav-label animate-fade-in">{item.label}</span>
+            )}
+          </NavLink>
+        ))}
       </div>
-    </div>
+
+      {/* Bottom: Patch info */}
+      <div className="border-t border-league-grey-dark/30 p-3 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-league-green animate-pulse" />
+        {expanded && (
+          <span className="text-xs text-league-grey-light animate-fade-in">
+            Patch {patch || '...'}
+          </span>
+        )}
+      </div>
+    </nav>
   );
 }

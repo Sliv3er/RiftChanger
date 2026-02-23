@@ -13,28 +13,23 @@ export default function ChampionDetail({ scanResult, onApply, addLog }: Props) {
   const navigate = useNavigate();
   const [officialSkins, setOfficialSkins] = useState<SkinData[]>([]);
   const [selectedSkin, setSelectedSkin] = useState<SkinEntry | null>(null);
-  const [previewSplash, setPreviewSplash] = useState<string>('');
-  const [showChromas, setShowChromas] = useState(false);
+  const [previewSplash, setPreviewSplash] = useState('');
+  const [expandedChroma, setExpandedChroma] = useState<string | null>(null);
 
   useEffect(() => {
     if (id && window.api) {
       window.api.getChampionSkins(id).then(skins => {
         setOfficialSkins(skins);
-        if (skins.length > 0) {
-          setPreviewSplash(skins[0].splashUrl);
-        }
+        if (skins.length > 0) setPreviewSplash(skins[0].splashUrl);
       }).catch(() => {});
     }
   }, [id]);
 
   if (!id) return null;
 
-  // Find local skins for this champion
-  const champName = id; // We need to map id to name
   const localSkins = scanResult?.skins.filter(s => {
-    // Match by champion name - need fuzzy match since folder names might differ from API ids
-    const normalized = s.championName.replace(/[^a-zA-Z]/g, '').toLowerCase();
-    return normalized === id.toLowerCase().replace(/[^a-zA-Z]/g, '');
+    const norm = s.championName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+    return norm === id.toLowerCase().replace(/[^a-zA-Z]/g, '');
   }) || [];
 
   const baseSkins = localSkins.filter(s => s.type === 'skin');
@@ -43,126 +38,114 @@ export default function ChampionDetail({ scanResult, onApply, addLog }: Props) {
   const exalted = localSkins.filter(s => s.type === 'exalted');
 
   const handleApply = (skin: SkinEntry) => {
-    if (!skin.valid) {
-      addLog(`Cannot apply invalid skin: ${skin.skinName}`);
-      return;
-    }
+    if (!skin.valid) { addLog(`Cannot apply invalid skin: ${skin.skinName}`); return; }
     onApply([skin]);
   };
 
-  // Match official skin to local skin
-  const findLocalSkin = (officialName: string): SkinEntry | undefined => {
+  const findLocalSkin = (name: string): SkinEntry | undefined => {
     return baseSkins.find(s => {
-      const localName = s.skinName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const offName = officialName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return localName.includes(offName) || offName.includes(localName);
+      const a = s.skinName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const b = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return a.includes(b) || b.includes(a);
     });
   };
 
-  // Get chromas for a specific skin
   const getChromasForSkin = (skinName: string): SkinEntry[] => {
     return chromas.filter(c => {
-      const chromaBase = c.skinName.replace(/\s*\d+$/, '').toLowerCase();
-      return skinName.toLowerCase().includes(chromaBase) || chromaBase.includes(skinName.toLowerCase());
+      const base = c.skinName.replace(/\s*\d+$/, '').toLowerCase();
+      return skinName.toLowerCase().includes(base) || base.includes(skinName.toLowerCase());
     });
   };
 
   return (
-    <div className="fade-in space-y-6">
-      {/* Back button + Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate('/champions')}
-          className="text-league-gold hover:text-league-gold-light transition-colors"
-        >
-          ← Back
-        </button>
-        <div>
-          <h1 className="font-beaufort text-3xl font-bold text-league-gold-light tracking-wide uppercase">
-            {id}
-          </h1>
-          <p className="text-league-grey text-sm">
-            {baseSkins.length} skins • {chromas.length} chromas available locally
-          </p>
+    <div className="animate-fade-in space-y-6">
+      {/* ══════ HERO BANNER ══════ */}
+      <div className="relative overflow-hidden league-card p-0" style={{ minHeight: 280 }}>
+        {previewSplash && (
+          <img src={previewSplash} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest via-league-blue-darkest/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-league-blue-darkest/80 to-transparent" />
+
+        <div className="relative z-10 p-8 flex flex-col justify-end h-full" style={{ minHeight: 280 }}>
+          {/* Breadcrumb */}
+          <button
+            onClick={() => navigate('/champions')}
+            className="text-league-grey-light hover:text-league-gold text-sm transition-colors mb-auto"
+          >
+            ← Champions / <span className="text-league-gold">{id}</span>
+          </button>
+
+          <div>
+            <h1 className="font-beaufort text-5xl font-bold text-league-gold-light tracking-widest uppercase drop-shadow-lg">
+              {id}
+            </h1>
+            <div className="flex gap-2 mt-3">
+              <span className="badge-gold">{baseSkins.length} skins</span>
+              <span className="badge-blue">{chromas.length} chromas</span>
+              {forms.length > 0 && <span className="badge-dark">{forms.length} forms</span>}
+              {exalted.length > 0 && <span className="badge-dark">{exalted.length} exalted</span>}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Splash Preview */}
-      {previewSplash && (
-        <div className="relative rounded overflow-hidden league-border-light" style={{ maxHeight: '300px' }}>
-          <img
-            src={previewSplash}
-            alt="Skin preview"
-            className="w-full object-cover"
-            style={{ maxHeight: '300px' }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest/80 to-transparent" />
-          {selectedSkin && (
-            <div className="absolute bottom-4 left-4">
-              <p className="font-beaufort text-xl text-league-gold-light">{selectedSkin.skinName}</p>
-              <p className="text-league-grey text-xs">
-                {selectedSkin.valid ? '✅ Valid' : '❌ Invalid'} • {selectedSkin.type}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ══════ SKIN GRID ══════ */}
+      <div className="section-header">
+        <h2>Available Skins</h2>
+      </div>
 
-      {/* Official Skins from API with local availability */}
-      <div>
-        <h2 className="font-beaufort text-lg text-league-gold tracking-wide mb-3">SKINS</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {officialSkins.map(skin => {
-            const localMatch = findLocalSkin(skin.name);
-            const skinChromas = localMatch ? getChromasForSkin(localMatch.skinName) : [];
-            return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {officialSkins.map(skin => {
+          const local = findLocalSkin(skin.name);
+          const skinChromas = local ? getChromasForSkin(local.skinName) : [];
+          const isSelected = selectedSkin?.skinName === local?.skinName;
+
+          return (
+            <div key={skin.id} className="space-y-2">
               <div
-                key={skin.id}
-                className={`skin-card bg-league-grey-cool rounded overflow-hidden cursor-pointer ${
-                  selectedSkin?.skinName === localMatch?.skinName ? 'league-border-gold' : ''
+                className={`league-card group cursor-pointer overflow-hidden transition-all duration-300 ${
+                  isSelected ? 'border-league-gold shadow-gold-lg' : ''
                 }`}
                 onClick={() => {
                   setPreviewSplash(skin.splashUrl);
-                  if (localMatch) setSelectedSkin(localMatch);
+                  if (local) setSelectedSkin(local);
                 }}
               >
                 <div className="relative aspect-[3/4] overflow-hidden">
                   <img
                     src={skin.loadingUrl}
                     alt={skin.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = skin.splashUrl;
-                    }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = skin.splashUrl; }}
                   />
-                  {/* Availability badge */}
-                  <div className={`absolute top-2 right-2 px-2 py-0.5 rounded text-xs ${
-                    localMatch
-                      ? localMatch.valid
-                        ? 'bg-green-600/80 text-white'
-                        : 'bg-yellow-600/80 text-white'
-                      : 'bg-league-grey-dark/80 text-league-grey'
+                  <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest/90 via-transparent to-transparent" />
+
+                  {/* Status badge */}
+                  <div className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider ${
+                    local
+                      ? local.valid ? 'bg-league-green text-white' : 'bg-yellow-600 text-white'
+                      : 'bg-league-grey-dark text-league-grey-light'
                   }`}>
-                    {localMatch ? (localMatch.valid ? 'Available' : 'Invalid') : 'Not in library'}
+                    {local ? (local.valid ? '✓ Ready' : '⚠ Invalid') : 'Missing'}
                   </div>
-                  {/* Chroma count */}
+
+                  {/* Chroma indicator */}
                   {skinChromas.length > 0 && (
-                    <div className="absolute bottom-2 right-2 bg-league-blue-darkest/80 px-2 py-0.5 rounded text-xs text-league-gold">
+                    <div className="absolute bottom-2 right-2 bg-league-blue-darkest/80 border border-league-gold/30 text-league-gold text-[10px] px-2 py-0.5">
                       {skinChromas.length} chromas
                     </div>
                   )}
                 </div>
-                <div className="p-3">
-                  <p className="text-league-gold-light text-sm font-beaufort truncate">{skin.name}</p>
-                  <div className="flex gap-2 mt-2">
-                    {localMatch && localMatch.valid && (
+
+                <div className="p-3 space-y-2">
+                  <p className="font-beaufort text-sm text-league-gold-light truncate">{skin.name}</p>
+                  <div className="flex gap-1">
+                    {local?.valid && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApply(localMatch);
-                        }}
-                        className="btn-league-primary text-xs py-1 px-3 flex-1"
+                        onClick={(e) => { e.stopPropagation(); handleApply(local); }}
+                        className="btn-primary text-[10px] py-1.5 px-3 flex-1"
                       >
                         Apply
                       </button>
@@ -171,64 +154,56 @@ export default function ChampionDetail({ scanResult, onApply, addLog }: Props) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setShowChromas(!showChromas);
-                          setSelectedSkin(localMatch || null);
+                          setExpandedChroma(expandedChroma === skin.name ? null : skin.name);
                         }}
-                        className="btn-league text-xs py-1 px-3"
+                        className="btn-secondary text-[10px] py-1.5 px-2"
                       >
-                        Chromas
+                        🎨
                       </button>
                     )}
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Chroma expansion */}
+              {expandedChroma === skin.name && skinChromas.length > 0 && (
+                <div className="league-card p-3 animate-slide-up space-y-2">
+                  <p className="text-xs text-league-gold font-beaufort tracking-wide">Chromas</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {skinChromas.map(chroma => (
+                      <button
+                        key={chroma.zipPath}
+                        onClick={() => handleApply(chroma)}
+                        disabled={!chroma.valid}
+                        className={`text-[10px] py-1.5 px-2 truncate transition-all ${
+                          chroma.valid
+                            ? 'btn-secondary'
+                            : 'bg-league-grey-dark text-league-grey-lightest cursor-not-allowed border border-league-grey-dark'
+                        }`}
+                      >
+                        {chroma.chromaId || chroma.skinName.split(' ').pop()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Chromas section */}
-      {showChromas && selectedSkin && (
-        <div className="league-border bg-league-blue-deeper rounded p-4 fade-in">
-          <h3 className="font-beaufort text-lg text-league-gold mb-3">
-            CHROMAS — {selectedSkin.skinName}
-          </h3>
-          <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-2">
-            {getChromasForSkin(selectedSkin.skinName).map(chroma => (
-              <div
-                key={chroma.zipPath}
-                className="skin-card bg-league-grey-cool rounded p-2 text-center"
-              >
-                <p className="text-xs text-league-grey truncate">{chroma.chromaId || chroma.skinName}</p>
-                <button
-                  onClick={() => handleApply(chroma)}
-                  disabled={!chroma.valid}
-                  className={`mt-1 text-xs py-1 px-2 rounded w-full ${
-                    chroma.valid
-                      ? 'btn-league-primary'
-                      : 'bg-league-grey-dark text-league-grey cursor-not-allowed'
-                  }`}
-                >
-                  Apply
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Forms & Exalted */}
+      {/* ══════ FORMS ══════ */}
       {forms.length > 0 && (
         <div>
-          <h2 className="font-beaufort text-lg text-league-gold tracking-wide mb-3">FORMS</h2>
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="section-header"><h2>Forms</h2></div>
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {forms.map(form => (
-              <div key={form.zipPath} className="skin-card bg-league-grey-cool rounded p-3">
-                <p className="text-league-gold-light text-sm truncate">{form.skinName}</p>
+              <div key={form.zipPath} className="league-card p-3 text-center">
+                <p className="text-league-gold-light text-xs font-beaufort truncate mb-2">{form.skinName}</p>
                 <button
                   onClick={() => handleApply(form)}
                   disabled={!form.valid}
-                  className="btn-league text-xs py-1 mt-2 w-full"
+                  className="btn-secondary text-[10px] py-1 w-full"
                 >
                   Apply
                 </button>
@@ -238,17 +213,18 @@ export default function ChampionDetail({ scanResult, onApply, addLog }: Props) {
         </div>
       )}
 
+      {/* ══════ EXALTED ══════ */}
       {exalted.length > 0 && (
         <div>
-          <h2 className="font-beaufort text-lg text-league-gold tracking-wide mb-3">EXALTED</h2>
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="section-header"><h2>Exalted</h2></div>
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {exalted.map(ex => (
-              <div key={ex.zipPath} className="skin-card bg-league-grey-cool rounded p-3">
-                <p className="text-league-gold-light text-sm truncate">{ex.skinName}</p>
+              <div key={ex.zipPath} className="league-card p-3 text-center">
+                <p className="text-league-gold-light text-xs font-beaufort truncate mb-2">{ex.skinName}</p>
                 <button
                   onClick={() => handleApply(ex)}
                   disabled={!ex.valid}
-                  className="btn-league text-xs py-1 mt-2 w-full"
+                  className="btn-secondary text-[10px] py-1 w-full"
                 >
                   Apply
                 </button>

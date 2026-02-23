@@ -15,35 +15,24 @@ export default function Dashboard({ scanResult, patch, onScan, skinsPath, addLog
   const [cslolReady, setCslolReady] = useState(false);
   const [loading, setLoading] = useState('');
   const [installedMods, setInstalledMods] = useState<string[]>([]);
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 
-  useEffect(() => {
-    setInputPath(skinsPath);
-  }, [skinsPath]);
-
-  useEffect(() => {
-    checkCslol();
-  }, []);
+  useEffect(() => { setInputPath(skinsPath); }, [skinsPath]);
+  useEffect(() => { checkCslol(); }, []);
 
   const checkCslol = async () => {
-    if (window.api) {
-      const ready = await window.api.isCslolReady();
-      setCslolReady(ready);
-      if (ready) {
-        const mods = await window.api.listInstalledMods();
-        setInstalledMods(mods);
-      }
+    if (!window.api) return;
+    const ready = await window.api.isCslolReady();
+    setCslolReady(ready);
+    if (ready) {
+      const mods = await window.api.listInstalledMods();
+      setInstalledMods(mods);
     }
-  };
-
-  const handleScan = () => {
-    if (inputPath) onScan(inputPath);
   };
 
   const handleBrowse = async () => {
     if (window.api) {
-      const path = await window.api.selectFolder();
-      if (path) setInputPath(path);
+      const p = await window.api.selectFolder();
+      if (p) setInputPath(p);
     }
   };
 
@@ -56,14 +45,13 @@ export default function Dashboard({ scanResult, patch, onScan, skinsPath, addLog
   };
 
   const handleSetupCslol = async () => {
-    if (window.api) {
-      setLoading('cslol');
-      addLog('Downloading CSLoL Manager...');
-      const result = await window.api.setupCslol();
-      addLog(result.message);
-      setCslolReady(result.success);
-      setLoading('');
-    }
+    if (!window.api) return;
+    setLoading('cslol');
+    addLog('Downloading CSLoL Manager...');
+    const result = await window.api.setupCslol();
+    addLog(result.message);
+    setCslolReady(result.success);
+    setLoading('');
   };
 
   const handleLaunchCslol = async () => {
@@ -73,223 +61,134 @@ export default function Dashboard({ scanResult, patch, onScan, skinsPath, addLog
     }
   };
 
-  const handleUpdateSkins = async () => {
-    if (!inputPath || !window.api) return;
-    setLoading('update');
-    addLog('Updating skin library from GitHub...');
-    const result = await window.api.updateSkins(inputPath);
-    addLog(result.message);
-    if (result.success && result.updated > 0) {
-      addLog(`${result.updated} skin files updated. Rescanning...`);
-      onScan(inputPath);
-    }
-    setLoading('');
-  };
-
-  const handleCheckLastUpdate = async () => {
-    if (inputPath && window.api) {
-      const date = await window.api.getLastUpdate(inputPath);
-      setLastUpdate(date);
-      if (date) addLog(`Skin library last updated: ${date}`);
-      else addLog('Could not determine last update (not a git repo)');
-    }
-  };
-
-  const handleRemoveAll = async () => {
-    if (window.api) {
-      const result = await window.api.removeSkins();
-      addLog(result.message);
-      setInstalledMods([]);
-    }
-  };
-
-  // Generator state
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState<{total: number; done: number; current: string; errors: string[]; generated: number} | null>(null);
-
-  useEffect(() => {
-    if (window.api?.onGeneratorAllProgress) {
-      window.api.onGeneratorAllProgress((progress) => {
-        setGenProgress(progress);
-      });
-    }
-  }, []);
-
-  const handleGenerateAll = async () => {
-    if (!window.api || generating) return;
-    setGenerating(true);
-    setGenProgress(null);
-    addLog('Starting skin generation for all champions...');
-    try {
-      const result = await window.api.generateAll(inputPath);
-      addLog(`Generation complete: ${result.generated} skins generated, ${result.errors.length} errors`);
-      setGenProgress(result);
-    } catch (e: any) {
-      addLog(`Generation failed: ${e.message}`);
-    }
-    setGenerating(false);
-  };
-
   const validSkins = scanResult?.skins.filter(s => s.valid).length || 0;
-  const invalidSkins = scanResult?.skins.filter(s => !s.valid).length || 0;
 
   return (
-    <div className="fade-in space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="font-beaufort text-3xl font-bold text-league-gold-light tracking-wide">
-          DASHBOARD
-        </h1>
-        <p className="text-league-grey text-sm mt-1">
-          Manage your custom skin library
-        </p>
-      </div>
-
-      {/* Status Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="league-border bg-league-grey-cool rounded p-4">
-          <p className="text-league-grey text-xs uppercase tracking-wider">Current Patch</p>
-          <p className="text-league-gold font-beaufort text-2xl mt-1">{patch || '—'}</p>
-        </div>
-        <div className="league-border bg-league-grey-cool rounded p-4">
-          <p className="text-league-grey text-xs uppercase tracking-wider">Game Status</p>
-          <p className={`font-beaufort text-2xl mt-1 ${gameInfo?.found ? 'text-green-400' : 'text-league-grey'}`}>
-            {gameInfo ? (gameInfo.found ? 'DETECTED' : 'NOT FOUND') : '—'}
+    <div className="animate-fade-in space-y-8 max-w-6xl mx-auto">
+      {/* ══════ HERO ══════ */}
+      <div className="relative overflow-hidden league-card p-0">
+        <div className="absolute inset-0 bg-gradient-to-r from-league-blue-darkest via-league-blue-darker to-league-blue-deep opacity-80" />
+        <div className="absolute inset-0 bg-[url('https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-splashes/uncentered/103/103000.jpg')] bg-cover bg-center opacity-15" />
+        <div className="relative z-10 p-8">
+          <h1 className="font-beaufort text-4xl font-bold tracking-widest uppercase">
+            <span className="gold-shimmer">RiftChanger</span>
+          </h1>
+          <p className="text-league-grey-light text-sm mt-2 max-w-md">
+            Your premium custom skin manager. Browse, generate, and apply skins with CSLoL integration.
           </p>
-        </div>
-        <div className="league-border bg-league-grey-cool rounded p-4">
-          <p className="text-league-grey text-xs uppercase tracking-wider">CSLoL Manager</p>
-          <p className={`font-beaufort text-2xl mt-1 ${cslolReady ? 'text-green-400' : 'text-yellow-400'}`}>
-            {cslolReady ? 'READY' : 'NOT SETUP'}
-          </p>
-        </div>
-        <div className="league-border bg-league-grey-cool rounded p-4">
-          <p className="text-league-grey text-xs uppercase tracking-wider">Active Mods</p>
-          <p className="text-league-gold font-beaufort text-2xl mt-1">{installedMods.length}</p>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => inputPath && onScan(inputPath)} className="btn-primary">
+              Scan Library
+            </button>
+            {cslolReady ? (
+              <button onClick={handleLaunchCslol} className="btn-secondary">
+                🚀 Launch CSLoL
+              </button>
+            ) : (
+              <button onClick={handleSetupCslol} className="btn-secondary" disabled={loading === 'cslol'}>
+                {loading === 'cslol' ? '⏳ Setting up...' : '📦 Setup CSLoL'}
+              </button>
+            )}
+            <button onClick={handleDetectGame} className="btn-secondary">
+              🔍 Detect Game
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Action Bar */}
-      <div className="flex gap-3 flex-wrap">
-        <button onClick={handleDetectGame} className="btn-league text-sm">
-          🔍 Detect Game
-        </button>
-        <button onClick={handleSetupCslol} className="btn-league text-sm" disabled={loading === 'cslol'}>
-          {loading === 'cslol' ? '⏳ Downloading...' : '📦 Setup CSLoL'}
-        </button>
-        {cslolReady && (
-          <button onClick={handleLaunchCslol} className="btn-league-primary text-sm">
-            🚀 Launch CSLoL Manager
-          </button>
-        )}
-        {installedMods.length > 0 && (
-          <button onClick={handleRemoveAll} className="btn-league text-sm text-red-400 border-red-400/50">
-            🗑️ Remove All Mods
-          </button>
-        )}
+      {/* ══════ STATS ROW ══════ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon="🎮" value={patch || '—'} label="Current Patch" isText />
+        <StatCard icon="🎨" value={scanResult?.totalSkins || 0} label="Total Skins" />
+        <StatCard icon="⚔" value={scanResult?.champions.length || 0} label="Champions" />
+        <StatCard
+          icon={cslolReady ? '✅' : '⚠'}
+          value={cslolReady ? installedMods.length : 0}
+          label={cslolReady ? 'Active Mods' : 'CSLoL Not Setup'}
+        />
       </div>
 
-      {/* Skins Folder */}
-      <div className="league-border bg-league-blue-deeper rounded p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-beaufort text-lg text-league-gold tracking-wide">SKIN LIBRARY</h2>
-          {lastUpdate && (
-            <span className="text-league-grey text-xs">Last updated: {lastUpdate}</span>
-          )}
+      {/* ══════ SKIN LIBRARY PATH ══════ */}
+      <div className="league-card p-6 space-y-4">
+        <div className="section-header">
+          <h2>Skin Library</h2>
         </div>
         <div className="flex gap-2">
           <input
             type="text"
             value={inputPath}
             onChange={(e) => setInputPath(e.target.value)}
-            placeholder="Path to skins folder..."
-            className="search-input flex-1 rounded"
+            placeholder="Path to your skins folder..."
+            className="league-input flex-1"
           />
-          <button onClick={handleBrowse} className="btn-league text-sm">Browse</button>
-          <button onClick={handleScan} className="btn-league-primary text-sm">Scan</button>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={handleUpdateSkins} className="btn-league text-sm" disabled={loading === 'update'}>
-            {loading === 'update' ? '⏳ Updating...' : '🔄 Update Library (git pull)'}
-          </button>
-          <button onClick={handleCheckLastUpdate} className="btn-league text-sm">
-            📅 Check Version
-          </button>
+          <button onClick={handleBrowse} className="btn-secondary">Browse</button>
+          <button onClick={() => inputPath && onScan(inputPath)} className="btn-primary">Scan</button>
         </div>
       </div>
 
-      {/* Skin Generator */}
-      <div className="league-border bg-league-blue-deeper rounded p-5 space-y-4">
-        <h2 className="font-beaufort text-lg text-league-gold tracking-wide">SKIN GENERATOR</h2>
-        <p className="text-league-grey text-sm">
-          Generate fantome skin mods for all champions using CDragon bin files.
-        </p>
-        <button
-          onClick={handleGenerateAll}
-          className="btn-league-primary text-sm"
-          disabled={generating}
-        >
-          {generating ? '⏳ Generating...' : '⚡ Generate All Skins'}
-        </button>
-        {genProgress && (
-          <div className="space-y-2">
-            <div className="w-full bg-league-grey-cool rounded-full h-3 overflow-hidden">
-              <div
-                className="h-full bg-league-gold transition-all duration-300"
-                style={{ width: `${genProgress.total > 0 ? (genProgress.done / genProgress.total) * 100 : 0}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-league-grey">
-              <span>{genProgress.done}/{genProgress.total} champions</span>
-              <span>{genProgress.generated} skins generated</span>
-              {genProgress.errors.length > 0 && (
-                <span className="text-red-400">{genProgress.errors.length} errors</span>
-              )}
-            </div>
-            {genProgress.current && (
-              <p className="text-league-gold-light text-sm">Current: {genProgress.current}</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Scan Results */}
+      {/* ══════ SCAN RESULTS ══════ */}
       {scanResult && (
-        <div className="space-y-4 fade-in">
-          <h2 className="font-beaufort text-lg text-league-gold tracking-wide">SCAN RESULTS</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Champions" value={scanResult.champions.length} />
-            <StatCard label="Skins" value={scanResult.totalSkins} />
-            <StatCard label="Chromas" value={scanResult.totalChromas} />
-            <StatCard label="Valid" value={validSkins} color="text-green-400" />
-            {invalidSkins > 0 && (
-              <StatCard label="Invalid" value={invalidSkins} color="text-red-400" />
-            )}
-            <StatCard label="Forms" value={scanResult.totalForms} />
-            <StatCard label="Exalted" value={scanResult.totalExalted} />
-            <StatCard label="Total Files" value={scanResult.skins.length} />
+        <div className="space-y-4 animate-slide-up">
+          <div className="section-header">
+            <h2>Library Overview</h2>
           </div>
-
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MiniStat label="Valid Skins" value={validSkins} color="text-league-green" />
+            <MiniStat label="Chromas" value={scanResult.totalChromas} />
+            <MiniStat label="Forms" value={scanResult.totalForms} />
+            <MiniStat label="Exalted" value={scanResult.totalExalted} />
+          </div>
           {scanResult.errors.length > 0 && (
-            <div className="league-border bg-red-900/20 rounded p-4">
-              <p className="text-red-400 text-sm font-bold mb-2">Errors ({scanResult.errors.length})</p>
-              {scanResult.errors.slice(0, 10).map((err, i) => (
-                <p key={i} className="text-red-300 text-xs">{err}</p>
+            <div className="league-card border-league-red/30 p-4">
+              <p className="text-league-red text-sm font-bold mb-2">
+                {scanResult.errors.length} Error{scanResult.errors.length > 1 ? 's' : ''}
+              </p>
+              {scanResult.errors.slice(0, 5).map((err, i) => (
+                <p key={i} className="text-league-red/70 text-xs">{err}</p>
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Installed Mods */}
+      {/* ══════ GAME STATUS ══════ */}
+      {gameInfo && (
+        <div className="league-card p-5 animate-fade-in">
+          <div className="section-header">
+            <h2>Game Status</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="text-league-grey-light">Status: </span>
+              <span className={gameInfo.found ? 'text-league-green' : 'text-league-red'}>
+                {gameInfo.found ? 'Detected' : 'Not Found'}
+              </span>
+            </div>
+            {gameInfo.path && (
+              <div>
+                <span className="text-league-grey-light">Path: </span>
+                <span className="text-league-gold-light text-xs">{gameInfo.path}</span>
+              </div>
+            )}
+            <div>
+              <span className="text-league-grey-light">Running: </span>
+              <span className={gameInfo.isRunning ? 'text-league-green' : 'text-league-grey-light'}>
+                {gameInfo.isRunning ? 'Yes' : 'No'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ INSTALLED MODS ══════ */}
       {installedMods.length > 0 && (
-        <div className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-          <h2 className="font-beaufort text-lg text-league-gold tracking-wide">
-            INSTALLED MODS ({installedMods.length})
-          </h2>
+        <div className="league-card p-5 space-y-3">
+          <div className="section-header">
+            <h2>Installed Mods ({installedMods.length})</h2>
+          </div>
           <div className="max-h-48 overflow-y-auto space-y-1">
             {installedMods.map((mod, i) => (
-              <div key={i} className="flex items-center justify-between bg-league-grey-cool rounded px-3 py-2">
+              <div key={i} className="flex items-center justify-between bg-league-blue-darker/50 border border-league-grey-dark/30 px-4 py-2">
                 <span className="text-league-gold-light text-sm truncate">{mod.replace('.fantome', '')}</span>
                 <button
                   onClick={async () => {
@@ -300,50 +199,60 @@ export default function Dashboard({ scanResult, patch, onScan, skinsPath, addLog
                       setInstalledMods(mods);
                     }
                   }}
-                  className="text-red-400 hover:text-red-300 text-xs ml-2"
+                  className="text-league-red hover:text-red-300 text-xs ml-2 transition-colors"
                 >
                   ✕
                 </button>
               </div>
             ))}
           </div>
-          <p className="text-league-grey text-xs">
-            💡 After adding/removing mods, launch CSLoL Manager and click "Run" to apply changes to the game.
+          <p className="text-league-grey-light text-xs">
+            Launch CSLoL Manager and click "Run" to apply changes to the game.
           </p>
         </div>
       )}
 
-      {/* How It Works */}
-      <div className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
-        <h2 className="font-beaufort text-lg text-league-gold tracking-wide">HOW IT WORKS</h2>
-        <div className="grid grid-cols-4 gap-4 text-center">
-          <Step num={1} label="Scan" desc="Point to your skins folder and validate" />
-          <Step num={2} label="Browse" desc="Find skins by champion with previews" />
-          <Step num={3} label="Apply" desc="Import skins into CSLoL Manager" />
-          <Step num={4} label="Launch" desc="Open CSLoL Manager and click Run" />
+      {/* ══════ HOW IT WORKS ══════ */}
+      <div className="league-card p-6">
+        <div className="section-header">
+          <h2>How It Works</h2>
+        </div>
+        <div className="grid grid-cols-4 gap-6 text-center mt-4">
+          {[
+            { n: 1, icon: '📂', label: 'Scan', desc: 'Point to your skins folder' },
+            { n: 2, icon: '🔍', label: 'Browse', desc: 'Find skins by champion' },
+            { n: 3, icon: '✨', label: 'Apply', desc: 'Import into CSLoL' },
+            { n: 4, icon: '🚀', label: 'Play', desc: 'Launch and enjoy' },
+          ].map(step => (
+            <div key={step.n} className="space-y-2">
+              <div className="w-12 h-12 mx-auto flex items-center justify-center border border-league-gold/40 bg-league-gold/5 rotate-45">
+                <span className="text-xl -rotate-45">{step.icon}</span>
+              </div>
+              <p className="font-beaufort text-league-gold text-sm tracking-wide">{step.label}</p>
+              <p className="text-league-grey-light text-xs">{step.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, color = 'text-league-gold' }: { label: string; value: number; color?: string }) {
+function StatCard({ icon, value, label, isText }: { icon: string; value: number | string; label: string; isText?: boolean }) {
   return (
-    <div className="league-border bg-league-grey-cool rounded p-4 text-center">
-      <p className="text-league-grey text-xs uppercase tracking-wider">{label}</p>
-      <p className={`font-beaufort text-3xl mt-1 ${color}`}>{value.toLocaleString()}</p>
+    <div className="stat-card">
+      <div className="stat-icon">{icon}</div>
+      <div className="stat-value">{isText ? value : typeof value === 'number' ? value.toLocaleString() : value}</div>
+      <div className="stat-label">{label}</div>
     </div>
   );
 }
 
-function Step({ num, label, desc }: { num: number; label: string; desc: string }) {
+function MiniStat({ label, value, color = 'text-league-gold-bright' }: { label: string; value: number; color?: string }) {
   return (
-    <div>
-      <div className="w-10 h-10 rounded-full bg-league-gold/20 border border-league-gold flex items-center justify-center mx-auto mb-2">
-        <span className="text-league-gold font-beaufort font-bold">{num}</span>
-      </div>
-      <p className="text-league-gold-light text-sm font-beaufort">{label}</p>
-      <p className="text-league-grey text-xs mt-1">{desc}</p>
+    <div className="league-card p-4 text-center">
+      <p className={`font-beaufort text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
+      <p className="text-league-grey-light text-xs uppercase tracking-wider mt-1">{label}</p>
     </div>
   );
 }
