@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   skinsPath: string;
@@ -10,6 +10,21 @@ export default function Settings({ skinsPath, onScan, addLog }: Props) {
   const [path, setPath] = useState(skinsPath);
   const [gameInfo, setGameInfo] = useState<any>(null);
   const [backups, setBackups] = useState<any[]>([]);
+  const [genOutputDir, setGenOutputDir] = useState(skinsPath);
+  const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState<{total: number; done: number; current: string; errors: string[]; generated: number} | null>(null);
+
+  useEffect(() => {
+    setGenOutputDir(skinsPath);
+  }, [skinsPath]);
+
+  useEffect(() => {
+    if (window.api?.onGeneratorAllProgress) {
+      window.api.onGeneratorAllProgress((progress) => {
+        setGenProgress(progress);
+      });
+    }
+  }, []);
 
   const handleBrowse = async () => {
     if (window.api) {
@@ -102,6 +117,56 @@ export default function Settings({ skinsPath, onScan, addLog }: Props) {
         >
           Download & Setup
         </button>
+      </section>
+
+      {/* Skin Generator */}
+      <section className="league-border bg-league-blue-deeper rounded p-5 space-y-3">
+        <h2 className="font-beaufort text-lg text-league-gold">SKIN GENERATOR</h2>
+        <p className="text-league-grey text-sm">Generate fantome mods for all champions from CDragon.</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={genOutputDir}
+            onChange={(e) => setGenOutputDir(e.target.value)}
+            className="search-input flex-1 rounded"
+            placeholder="Output directory..."
+          />
+          <button onClick={async () => {
+            if (window.api) {
+              const selected = await window.api.selectFolder();
+              if (selected) setGenOutputDir(selected);
+            }
+          }} className="btn-league text-sm">Browse</button>
+        </div>
+        <button
+          onClick={async () => {
+            if (!window.api || generating) return;
+            setGenerating(true);
+            setGenProgress(null);
+            addLog('Starting skin generation...');
+            try {
+              const result = await window.api.generateAll(genOutputDir);
+              addLog(`Done: ${result.generated} generated, ${result.errors.length} errors`);
+              setGenProgress(result);
+            } catch (e: any) {
+              addLog(`Generation failed: ${e.message}`);
+            }
+            setGenerating(false);
+          }}
+          className="btn-league-primary text-sm"
+          disabled={generating}
+        >
+          {generating ? '⏳ Generating...' : '⚡ Generate All'}
+        </button>
+        {genProgress && (
+          <div className="space-y-1">
+            <div className="w-full bg-league-grey-cool rounded-full h-2 overflow-hidden">
+              <div className="h-full bg-league-gold transition-all" style={{ width: `${genProgress.total > 0 ? (genProgress.done / genProgress.total) * 100 : 0}%` }} />
+            </div>
+            <p className="text-league-grey text-xs">{genProgress.done}/{genProgress.total} champions — {genProgress.generated} skins — {genProgress.errors.length} errors</p>
+            {genProgress.current && <p className="text-league-gold-light text-xs">{genProgress.current}</p>}
+          </div>
+        )}
       </section>
 
       {/* Backups */}

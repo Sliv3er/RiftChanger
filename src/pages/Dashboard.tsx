@@ -103,6 +103,33 @@ export default function Dashboard({ scanResult, patch, onScan, skinsPath, addLog
     }
   };
 
+  // Generator state
+  const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState<{total: number; done: number; current: string; errors: string[]; generated: number} | null>(null);
+
+  useEffect(() => {
+    if (window.api?.onGeneratorAllProgress) {
+      window.api.onGeneratorAllProgress((progress) => {
+        setGenProgress(progress);
+      });
+    }
+  }, []);
+
+  const handleGenerateAll = async () => {
+    if (!window.api || generating) return;
+    setGenerating(true);
+    setGenProgress(null);
+    addLog('Starting skin generation for all champions...');
+    try {
+      const result = await window.api.generateAll(inputPath);
+      addLog(`Generation complete: ${result.generated} skins generated, ${result.errors.length} errors`);
+      setGenProgress(result);
+    } catch (e: any) {
+      addLog(`Generation failed: ${e.message}`);
+    }
+    setGenerating(false);
+  };
+
   const validSkins = scanResult?.skins.filter(s => s.valid).length || 0;
   const invalidSkins = scanResult?.skins.filter(s => !s.valid).length || 0;
 
@@ -189,6 +216,41 @@ export default function Dashboard({ scanResult, patch, onScan, skinsPath, addLog
             📅 Check Version
           </button>
         </div>
+      </div>
+
+      {/* Skin Generator */}
+      <div className="league-border bg-league-blue-deeper rounded p-5 space-y-4">
+        <h2 className="font-beaufort text-lg text-league-gold tracking-wide">SKIN GENERATOR</h2>
+        <p className="text-league-grey text-sm">
+          Generate fantome skin mods for all champions using CDragon bin files.
+        </p>
+        <button
+          onClick={handleGenerateAll}
+          className="btn-league-primary text-sm"
+          disabled={generating}
+        >
+          {generating ? '⏳ Generating...' : '⚡ Generate All Skins'}
+        </button>
+        {genProgress && (
+          <div className="space-y-2">
+            <div className="w-full bg-league-grey-cool rounded-full h-3 overflow-hidden">
+              <div
+                className="h-full bg-league-gold transition-all duration-300"
+                style={{ width: `${genProgress.total > 0 ? (genProgress.done / genProgress.total) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-league-grey">
+              <span>{genProgress.done}/{genProgress.total} champions</span>
+              <span>{genProgress.generated} skins generated</span>
+              {genProgress.errors.length > 0 && (
+                <span className="text-red-400">{genProgress.errors.length} errors</span>
+              )}
+            </div>
+            {genProgress.current && (
+              <p className="text-league-gold-light text-sm">Current: {genProgress.current}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Scan Results */}

@@ -104,6 +104,13 @@ declare global {
 
       // Shell
       openExternal: (url: string) => void;
+
+      // Generator
+      generateSkin: (champId: string, skinNum: number, skinName: string) => Promise<{success: boolean; message: string; outputPath?: string}>;
+      generateChampion: (champId: string) => Promise<{generated: number; failed: number; errors: string[]}>;
+      generateAll: (outputDir?: string) => Promise<{total: number; done: number; current: string; errors: string[]; generated: number}>;
+      onGeneratorProgress: (cb: (msg: string) => void) => void;
+      onGeneratorAllProgress: (cb: (progress: {total: number; done: number; current: string; errors: string[]; generated: number}) => void) => void;
     };
   }
 }

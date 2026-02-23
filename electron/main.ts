@@ -6,6 +6,7 @@ import { GameDetector } from './services/gameDetector';
 import { CslolService } from './services/cslolService';
 import { BackupService } from './services/backupService';
 import { SkinUpdater } from './services/skinUpdater';
+import { SkinGenerator } from './services/skinGenerator';
 
 let mainWindow: BrowserWindow | null = null;
 let skinScanner: SkinScanner;
@@ -14,6 +15,7 @@ let gameDetector: GameDetector;
 let cslolService: CslolService;
 let backupService: BackupService;
 let skinUpdater: SkinUpdater;
+let skinGenerator: SkinGenerator;
 
 const isDev = !app.isPackaged;
 
@@ -56,6 +58,7 @@ function initServices() {
   cslolService = new CslolService(userDataPath);
   backupService = new BackupService(backupPath);
   skinUpdater = new SkinUpdater();
+  skinGenerator = new SkinGenerator(path.join(userDataPath, 'generated-skins'));
 }
 
 function registerIPC() {
@@ -150,6 +153,26 @@ function registerIPC() {
 
   ipcMain.handle('skins:clone', async (_e, targetDir: string) => {
     return skinUpdater.clone(targetDir);
+  });
+
+  // Skin Generator
+  ipcMain.handle('generator:generateSkin', async (_e, champId: string, skinNum: number, skinName: string) => {
+    return skinGenerator.generateSkin(champId, skinNum, skinName);
+  });
+
+  ipcMain.handle('generator:generateChampion', async (_e, champId: string) => {
+    return skinGenerator.generateChampion(champId, (msg) => {
+      mainWindow?.webContents.send('generator:progress', msg);
+    });
+  });
+
+  ipcMain.handle('generator:generateAll', async (_e, outputDir?: string) => {
+    if (outputDir) {
+      skinGenerator = new SkinGenerator(outputDir);
+    }
+    return skinGenerator.generateAll((progress) => {
+      mainWindow?.webContents.send('generator:allProgress', progress);
+    });
   });
 
   // Backup
