@@ -11,7 +11,6 @@ import type { ScanResult, ChampionData, SkinEntry } from './types/api';
 export default function App() {
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [champions, setChampions] = useState<ChampionData[]>([]);
-  const [appliedSkins, setAppliedSkins] = useState<SkinEntry[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [skinsPath, setSkinsPath] = useState<string>('');
   const [patch, setPatch] = useState<string>('');
@@ -21,7 +20,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Load champions from API on mount
     const init = async () => {
       try {
         if (window.api) {
@@ -47,7 +45,10 @@ export default function App() {
       if (window.api) {
         const result = await window.api.scanSkins(path);
         setScanResult(result);
-        addLog(`Scan complete: ${result.totalSkins} skins, ${result.totalChromas} chromas, ${result.totalForms} forms`);
+        addLog(`Scan complete: ${result.totalSkins} skins, ${result.totalChromas} chromas, ${result.totalForms} forms, ${result.totalExalted} exalted`);
+        const valid = result.skins.filter(s => s.valid).length;
+        const invalid = result.skins.filter(s => !s.valid).length;
+        addLog(`Validation: ${valid} valid, ${invalid} invalid out of ${result.skins.length} total`);
         if (result.errors.length > 0) {
           result.errors.forEach(e => addLog(`Error: ${e}`));
         }
@@ -58,16 +59,18 @@ export default function App() {
   };
 
   const handleApply = async (skins: SkinEntry[]) => {
-    addLog(`Applying ${skins.length} skins...`);
+    addLog(`Importing ${skins.length} skin(s) to CSLoL Manager...`);
     try {
       if (window.api) {
         const result = await window.api.applySkins(skins);
-        if (result.success) {
-          setAppliedSkins(prev => [...prev, ...skins]);
-          addLog(`Applied: ${result.applied.join(', ')}`);
+        if (result.applied.length > 0) {
+          addLog(`✅ Imported: ${result.applied.join(', ')}`);
         }
         if (result.errors.length > 0) {
-          result.errors.forEach(e => addLog(`Error: ${e}`));
+          result.errors.forEach(e => addLog(`❌ ${e}`));
+        }
+        if (result.launchCslol) {
+          addLog('💡 Open CSLoL Manager and click "Run" to apply skins to the game.');
         }
       }
     } catch (e: any) {

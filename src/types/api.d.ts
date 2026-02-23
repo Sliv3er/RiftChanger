@@ -63,23 +63,46 @@ declare global {
       minimize: () => void;
       maximize: () => void;
       close: () => void;
+
+      // Skins
       scanSkins: (path: string) => Promise<ScanResult>;
       validateSkin: (path: string) => Promise<SkinEntry>;
+
+      // Skin Updater
+      updateSkins: (path: string) => Promise<{ success: boolean; message: string; updated: number }>;
+      isGitRepo: (path: string) => Promise<boolean>;
+      getLastUpdate: (path: string) => Promise<string | null>;
+      cloneSkins: (targetDir: string) => Promise<{ success: boolean; message: string }>;
+
+      // Assets
       getChampions: () => Promise<ChampionData[]>;
       getChampionSkins: (id: string) => Promise<SkinData[]>;
       getSplashUrl: (id: string, num: number) => Promise<string>;
       getIconUrl: (id: string) => Promise<string>;
       getCurrentPatch: () => Promise<string>;
+
+      // Game
       detectGame: () => Promise<GameInfo>;
       getGamePatch: () => Promise<string | null>;
-      setupCslol: () => Promise<{ success: boolean; message: string }>;
+
+      // CSLoL
+      setupCslol: () => Promise<{ success: boolean; message: string; exePath?: string }>;
       isCslolReady: () => Promise<boolean>;
-      applySkins: (skins: SkinEntry[]) => Promise<{ success: boolean; applied: string[]; errors: string[] }>;
-      removeSkins: () => Promise<{ success: boolean; message: string }>;
+      applySkins: (skins: SkinEntry[]) => Promise<{ success: boolean; applied: string[]; errors: string[]; launchCslol: boolean }>;
+      removeSkins: () => Promise<{ success: boolean; removed: number; message: string }>;
+      removeSkin: (name: string) => Promise<{ success: boolean; message: string }>;
+      listInstalledMods: () => Promise<string[]>;
+      launchCslol: () => Promise<{ success: boolean; message: string }>;
+
+      // Backup
       createBackup: (path: string) => Promise<{ success: boolean; backupId: string; message: string }>;
       restoreBackup: (id: string, path: string) => Promise<{ success: boolean; message: string }>;
       listBackups: () => Promise<BackupEntry[]>;
+
+      // Dialog
       selectFolder: () => Promise<string | null>;
+
+      // Shell
       openExternal: (url: string) => void;
     };
   }

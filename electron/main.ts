@@ -5,6 +5,7 @@ import { AssetService } from './services/assetService';
 import { GameDetector } from './services/gameDetector';
 import { CslolService } from './services/cslolService';
 import { BackupService } from './services/backupService';
+import { SkinUpdater } from './services/skinUpdater';
 
 let mainWindow: BrowserWindow | null = null;
 let skinScanner: SkinScanner;
@@ -12,6 +13,7 @@ let assetService: AssetService;
 let gameDetector: GameDetector;
 let cslolService: CslolService;
 let backupService: BackupService;
+let skinUpdater: SkinUpdater;
 
 const isDev = !app.isPackaged;
 
@@ -53,6 +55,7 @@ function initServices() {
   gameDetector = new GameDetector();
   cslolService = new CslolService(userDataPath);
   backupService = new BackupService(backupPath);
+  skinUpdater = new SkinUpdater();
 }
 
 function registerIPC() {
@@ -118,6 +121,35 @@ function registerIPC() {
 
   ipcMain.handle('cslol:remove', async () => {
     return cslolService.removeAll();
+  });
+
+  ipcMain.handle('cslol:removeSkin', async (_e, skinName: string) => {
+    return cslolService.removeSkin(skinName);
+  });
+
+  ipcMain.handle('cslol:listInstalled', async () => {
+    return cslolService.listInstalled();
+  });
+
+  ipcMain.handle('cslol:launch', async () => {
+    return cslolService.launchManager();
+  });
+
+  // Skin Updater
+  ipcMain.handle('skins:update', async (_e, skinsPath: string) => {
+    return skinUpdater.update(skinsPath);
+  });
+
+  ipcMain.handle('skins:isGitRepo', async (_e, skinsPath: string) => {
+    return skinUpdater.isGitRepo(skinsPath);
+  });
+
+  ipcMain.handle('skins:lastUpdate', async (_e, skinsPath: string) => {
+    return skinUpdater.getLastUpdateDate(skinsPath);
+  });
+
+  ipcMain.handle('skins:clone', async (_e, targetDir: string) => {
+    return skinUpdater.clone(targetDir);
   });
 
   // Backup
