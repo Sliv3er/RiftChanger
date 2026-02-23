@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout';
 import Champions from './pages/Champions';
 import ChampionDetail from './pages/ChampionDetail';
@@ -7,89 +7,99 @@ import Settings from './pages/Settings';
 import Logs from './pages/Logs';
 import Dashboard from './pages/Dashboard';
 import Generator from './pages/Generator';
-import type { ScanResult, ChampionData, SkinEntry } from './types/api';
+import type { LibChampion } from './types/api';
 
 export default function App() {
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [champions, setChampions] = useState<ChampionData[]>([]);
+  const [champions, setChampions] = useState<LibChampion[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
-  const [skinsPath, setSkinsPath] = useState<string>('');
-  const [patch, setPatch] = useState<string>('');
+  const [patch, setPatch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const addLog = (msg: string) => {
+  const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-  };
+  }, []);
+
+  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  const handleApply = useCallback(async (zipPath: string, skinName: string, champName: string) => {
+    if (!window.api) return;
+    addLog(`Applying: ${skinName}...`);
+    const result = await window.api.applySkin(zipPath, skinName, champName);
+    addLog(result.message);
+    showToast(result.message, result.success ? 'success' : 'error');
+  }, [addLog, showToast]);
 
   useEffect(() => {
     const init = async () => {
+      if (!window.api) { setLoading(false); return; }
       try {
-        if (window.api) {
-          const p = await window.api.getCurrentPatch();
-          setPatch(p);
-          addLog(`Current patch: ${p}`);
+        const p = await window.api.getCurrentPatch();
+        setPatch(p);
+        addLog(`Patch: ${p}`);
 
-          const champs = await window.api.getChampions();
-          setChampions(champs);
-          addLog(`Loaded ${champs.length} champions from Data Dragon`);
+        // Try cached index first
+        const cached = await window.api.getLibraryIndex();
+        if (cached) {
+          setChampions(cached);
+          addLog(`Loaded ${cached.length} champions from cache`);
         }
       } catch (e: any) {
         addLog(`Init error: ${e.message}`);
       }
+      setLoading(false);
     };
     init();
   }, []);
 
-  const handleScan = async (path: string) => {
-    setSkinsPath(path);
-    addLog(`Scanning skins folder: ${path}`);
+  const refreshIndex = useCallback(async () => {
+    if (!window.api) return;
+    setLoading(true);
+    addLog('Building library index...');
     try {
-      if (window.api) {
-        const result = await window.api.scanSkins(path);
-        setScanResult(result);
-        addLog(`Scan complete: ${result.totalSkins} skins, ${result.totalChromas} chromas`);
-        const valid = result.skins.filter(s => s.valid).length;
-        const invalid = result.skins.filter(s => !s.valid).length;
-        addLog(`Validation: ${valid} valid, ${invalid} invalid out of ${result.skins.length} total`);
-        if (result.errors.length > 0) {
-          result.errors.forEach(e => addLog(`Error: ${e}`));
-        }
-      }
+      const index = await window.api.buildLibraryIndex();
+      setChampions(index);
+      addLog(`Indexed ${index.length} champions`);
+      showToast(`Library indexed: ${index.length} champions`, 'success');
     } catch (e: any) {
-      addLog(`Scan failed: ${e.message}`);
+      addLog(`Index failed: ${e.message}`);
+      showToast('Index failed', 'error');
     }
-  };
-
-  const handleApply = async (skins: SkinEntry[]) => {
-    addLog(`Importing ${skins.length} skin(s) to CSLoL Manager...`);
-    try {
-      if (window.api) {
-        const result = await window.api.applySkins(skins);
-        if (result.applied.length > 0) addLog(`✅ Imported: ${result.applied.join(', ')}`);
-        if (result.errors.length > 0) result.errors.forEach(e => addLog(`❌ ${e}`));
-        if (result.launchCslol) addLog('💡 Open CSLoL Manager and click "Run" to apply.');
-      }
-    } catch (e: any) {
-      addLog(`Apply failed: ${e.message}`);
-    }
-  };
+    setLoading(false);
+  }, [addLog, showToast]);
 
   return (
     <Layout patch={patch}>
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-12 right-4 z-[100] px-5 py-3 text-sm animate-slide-in border ${
+          toast.type === 'success' ? 'bg-league-green-dark border-league-green/50 text-league-green' :
+          toast.type === 'error' ? 'bg-league-red-dark border-league-red/50 text-league-red' :
+          'bg-league-blue-deeper border-league-gold/30 text-league-gold'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
+
       <Routes>
         <Route path="/" element={
-          <Dashboard scanResult={scanResult} patch={patch} onScan={handleScan} skinsPath={skinsPath} addLog={addLog} />
+          <Dashboard champions={champions} patch={patch} loading={loading}
+                     onRefresh={refreshIndex} addLog={addLog} showToast={showToast} />
         } />
         <Route path="/champions" element={
-          <Champions champions={champions} scanResult={scanResult} />
+          <Champions champions={champions} loading={loading} />
         } />
         <Route path="/champion/:id" element={
-          <ChampionDetail scanResult={scanResult} onApply={handleApply} addLog={addLog} />
+          <ChampionDetail champions={champions} onApply={handleApply} addLog={addLog} showToast={showToast} />
         } />
         <Route path="/generator" element={
-          <Generator skinsPath={skinsPath} addLog={addLog} />
+          <Generator addLog={addLog} showToast={showToast} />
         } />
         <Route path="/settings" element={
-          <Settings skinsPath={skinsPath} onScan={handleScan} addLog={addLog} />
+          <Settings addLog={addLog} showToast={showToast} onRefresh={refreshIndex} />
         } />
         <Route path="/logs" element={<Logs logs={logs} />} />
       </Routes>

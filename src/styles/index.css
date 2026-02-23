@@ -271,7 +271,7 @@ h1, h2, h3 {
     @apply w-8 h-8 border-2 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
   }
   .league-spinner-lg {
-    @apply w-12 h-12 border-3 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
+    @apply w-12 h-12 border-4 border-league-gold/20 border-t-league-gold rounded-full animate-spin;
   }
 
   /* ═══════════════════════════════════════════

@@ -1,237 +1,176 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { ScanResult, SkinData, SkinEntry } from '../types/api';
+import type { LibChampion, LibSkin } from '../types/api';
 
 interface Props {
-  scanResult: ScanResult | null;
-  onApply: (skins: SkinEntry[]) => void;
+  champions: LibChampion[];
+  onApply: (zipPath: string, skinName: string, champName: string) => void;
   addLog: (msg: string) => void;
+  showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
-export default function ChampionDetail({ scanResult, onApply, addLog }: Props) {
+export default function ChampionDetail({ champions, onApply, addLog, showToast }: Props) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [officialSkins, setOfficialSkins] = useState<SkinData[]>([]);
-  const [selectedSkin, setSelectedSkin] = useState<SkinEntry | null>(null);
-  const [previewSplash, setPreviewSplash] = useState('');
-  const [expandedChroma, setExpandedChroma] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string>('');
+  const [expandedSkin, setExpandedSkin] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (id && window.api) {
-      window.api.getChampionSkins(id).then(skins => {
-        setOfficialSkins(skins);
-        if (skins.length > 0) setPreviewSplash(skins[0].splashUrl);
-      }).catch(() => {});
+  const champ = useMemo(() => champions.find(c => c.id === id), [champions, id]);
+
+  if (!champ) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <p className="text-league-grey-light">Champion not found. Build your library index first.</p>
+        <button onClick={() => navigate('/champions')} className="btn-secondary">← Back</button>
+      </div>
+    );
+  }
+
+  const heroSplash = preview || (champ.skins[0]?.splashUrl || '');
+
+  const handleApply = (skin: LibSkin) => {
+    if (!skin.available || !skin.zipPath) {
+      showToast(`${skin.name} not available. Generate it first.`, 'error');
+      return;
     }
-  }, [id]);
-
-  if (!id) return null;
-
-  const localSkins = scanResult?.skins.filter(s => {
-    const norm = s.championName.replace(/[^a-zA-Z]/g, '').toLowerCase();
-    return norm === id.toLowerCase().replace(/[^a-zA-Z]/g, '');
-  }) || [];
-
-  const baseSkins = localSkins.filter(s => s.type === 'skin');
-  const chromas = localSkins.filter(s => s.type === 'chroma');
-  const forms = localSkins.filter(s => s.type === 'form');
-  const exalted = localSkins.filter(s => s.type === 'exalted');
-
-  const handleApply = (skin: SkinEntry) => {
-    if (!skin.valid) { addLog(`Cannot apply invalid skin: ${skin.skinName}`); return; }
-    onApply([skin]);
-  };
-
-  const findLocalSkin = (name: string): SkinEntry | undefined => {
-    return baseSkins.find(s => {
-      const a = s.skinName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const b = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return a.includes(b) || b.includes(a);
-    });
-  };
-
-  const getChromasForSkin = (skinName: string): SkinEntry[] => {
-    return chromas.filter(c => {
-      const base = c.skinName.replace(/\s*\d+$/, '').toLowerCase();
-      return skinName.toLowerCase().includes(base) || base.includes(skinName.toLowerCase());
-    });
+    onApply(skin.zipPath, skin.name, champ.id);
   };
 
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* ══════ HERO BANNER ══════ */}
-      <div className="relative overflow-hidden league-card p-0" style={{ minHeight: 280 }}>
-        {previewSplash && (
-          <img src={previewSplash} alt="" className="absolute inset-0 w-full h-full object-cover" />
+    <div className="animate-fade-in space-y-5">
+      {/* ── HERO ── */}
+      <div className="relative overflow-hidden league-card" style={{ height: 260 }}>
+        {heroSplash && (
+          <img src={heroSplash} alt="" className="absolute inset-0 w-full h-full object-cover" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest via-league-blue-darkest/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-league-blue-darkest/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest via-league-blue-darkest/50 to-league-blue-darkest/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-league-blue-darkest/70 to-transparent" />
 
-        <div className="relative z-10 p-8 flex flex-col justify-end h-full" style={{ minHeight: 280 }}>
-          {/* Breadcrumb */}
-          <button
-            onClick={() => navigate('/champions')}
-            className="text-league-grey-light hover:text-league-gold text-sm transition-colors mb-auto"
-          >
-            ← Champions / <span className="text-league-gold">{id}</span>
+        <div className="relative h-full flex flex-col justify-between p-6">
+          <button onClick={() => navigate('/champions')}
+                  className="text-league-grey-light hover:text-league-gold text-sm transition-colors self-start">
+            ← Champions
           </button>
-
           <div>
-            <h1 className="font-beaufort text-5xl font-bold text-league-gold-light tracking-widest uppercase drop-shadow-lg">
-              {id}
+            <h1 className="font-beaufort text-4xl font-bold text-league-gold-light tracking-widest uppercase drop-shadow-lg">
+              {champ.name}
             </h1>
-            <div className="flex gap-2 mt-3">
-              <span className="badge-gold">{baseSkins.length} skins</span>
-              <span className="badge-blue">{chromas.length} chromas</span>
-              {forms.length > 0 && <span className="badge-dark">{forms.length} forms</span>}
-              {exalted.length > 0 && <span className="badge-dark">{exalted.length} exalted</span>}
+            <p className="text-league-grey-light text-sm italic">{champ.title}</p>
+            <div className="flex gap-2 mt-2">
+              {champ.tags.map(t => (
+                <span key={t} className="badge-dark text-[10px]">{t}</span>
+              ))}
+              <span className="badge-gold text-[10px]">{champ.skins.length} skins</span>
+              <span className="badge-blue text-[10px]">
+                {champ.skins.filter(s => s.available).length} available
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ══════ SKIN GRID ══════ */}
-      <div className="section-header">
-        <h2>Available Skins</h2>
-      </div>
+      {/* ── SKINS ── */}
+      <div className="section-header"><h2>Skins</h2></div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {officialSkins.map(skin => {
-          const local = findLocalSkin(skin.name);
-          const skinChromas = local ? getChromasForSkin(local.skinName) : [];
-          const isSelected = selectedSkin?.skinName === local?.skinName;
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {champ.skins.map(skin => (
+          <div key={skin.id} className="space-y-1">
+            <div
+              className={`league-card group cursor-pointer overflow-hidden transition-all ${
+                expandedSkin === skin.num ? 'border-league-gold shadow-gold' : ''
+              }`}
+              onClick={() => setPreview(skin.splashUrl)}
+            >
+              {/* Splash image */}
+              <div className="relative aspect-[3/4] overflow-hidden bg-league-grey-dark">
+                <img
+                  src={skin.loadingUrl}
+                  alt={skin.name}
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => { (e.target as HTMLImageElement).src = skin.splashUrl; }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest/90 via-transparent to-transparent" />
 
-          return (
-            <div key={skin.id} className="space-y-2">
-              <div
-                className={`league-card group cursor-pointer overflow-hidden transition-all duration-300 ${
-                  isSelected ? 'border-league-gold shadow-gold-lg' : ''
-                }`}
-                onClick={() => {
-                  setPreviewSplash(skin.splashUrl);
-                  if (local) setSelectedSkin(local);
-                }}
-              >
-                <div className="relative aspect-[3/4] overflow-hidden">
-                  <img
-                    src={skin.loadingUrl}
-                    alt={skin.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = skin.splashUrl; }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-league-blue-darkest/90 via-transparent to-transparent" />
+                {/* Status */}
+                <div className={`absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider ${
+                  skin.available ? 'bg-league-green text-white' : 'bg-league-grey-dark/80 text-league-grey-light'
+                }`}>
+                  {skin.available ? '✓' : '—'}
+                </div>
 
-                  {/* Status badge */}
-                  <div className={`absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider ${
-                    local
-                      ? local.valid ? 'bg-league-green text-white' : 'bg-yellow-600 text-white'
-                      : 'bg-league-grey-dark text-league-grey-light'
-                  }`}>
-                    {local ? (local.valid ? '✓ Ready' : '⚠ Invalid') : 'Missing'}
+                {/* Chroma count */}
+                {skin.chromas.length > 0 && (
+                  <div className="absolute top-2 left-2 bg-league-blue-darkest/80 border border-league-gold/30 text-league-gold text-[9px] px-1.5 py-0.5">
+                    {skin.chromas.length}🎨
                   </div>
+                )}
+              </div>
 
-                  {/* Chroma indicator */}
-                  {skinChromas.length > 0 && (
-                    <div className="absolute bottom-2 right-2 bg-league-blue-darkest/80 border border-league-gold/30 text-league-gold text-[10px] px-2 py-0.5">
-                      {skinChromas.length} chromas
-                    </div>
+              {/* Info + Actions */}
+              <div className="p-2.5 space-y-2">
+                <p className="font-beaufort text-xs text-league-gold-light truncate leading-tight">{skin.name}</p>
+                <div className="flex gap-1">
+                  {skin.available ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleApply(skin); }}
+                      className="btn-primary text-[9px] py-1.5 px-3 flex-1"
+                    >
+                      Apply
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-league-grey-lightest py-1">Not generated</span>
+                  )}
+                  {skin.chromas.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedSkin(expandedSkin === skin.num ? null : skin.num);
+                      }}
+                      className="btn-secondary text-[9px] py-1.5 px-2"
+                    >
+                      🎨
+                    </button>
                   )}
                 </div>
+              </div>
+            </div>
 
-                <div className="p-3 space-y-2">
-                  <p className="font-beaufort text-sm text-league-gold-light truncate">{skin.name}</p>
-                  <div className="flex gap-1">
-                    {local?.valid && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleApply(local); }}
-                        className="btn-primary text-[10px] py-1.5 px-3 flex-1"
-                      >
-                        Apply
-                      </button>
-                    )}
-                    {skinChromas.length > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedChroma(expandedChroma === skin.name ? null : skin.name);
-                        }}
-                        className="btn-secondary text-[10px] py-1.5 px-2"
-                      >
-                        🎨
-                      </button>
-                    )}
-                  </div>
+            {/* Chroma expansion */}
+            {expandedSkin === skin.num && skin.chromas.length > 0 && (
+              <div className="league-card p-2.5 animate-slide-up space-y-1.5">
+                <p className="text-[10px] text-league-gold font-beaufort tracking-wide uppercase">
+                  Chromas ({skin.chromas.length})
+                </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {skin.chromas.map(ch => (
+                    <button
+                      key={ch.num}
+                      onClick={() => {
+                        if (ch.available && ch.zipPath) {
+                          onApply(ch.zipPath, ch.name, champ.id);
+                        } else {
+                          showToast('Chroma not generated yet', 'error');
+                        }
+                      }}
+                      className={`text-[9px] py-1.5 px-1.5 truncate transition-all border ${
+                        ch.available
+                          ? 'border-league-green/30 text-league-green hover:bg-league-green/10'
+                          : 'border-league-grey-dark text-league-grey-lightest'
+                      }`}
+                    >
+                      {ch.available ? '✓ ' : ''}{ch.name.split(' ').pop()}
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              {/* Chroma expansion */}
-              {expandedChroma === skin.name && skinChromas.length > 0 && (
-                <div className="league-card p-3 animate-slide-up space-y-2">
-                  <p className="text-xs text-league-gold font-beaufort tracking-wide">Chromas</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {skinChromas.map(chroma => (
-                      <button
-                        key={chroma.zipPath}
-                        onClick={() => handleApply(chroma)}
-                        disabled={!chroma.valid}
-                        className={`text-[10px] py-1.5 px-2 truncate transition-all ${
-                          chroma.valid
-                            ? 'btn-secondary'
-                            : 'bg-league-grey-dark text-league-grey-lightest cursor-not-allowed border border-league-grey-dark'
-                        }`}
-                      >
-                        {chroma.chromaId || chroma.skinName.split(' ').pop()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* ══════ FORMS ══════ */}
-      {forms.length > 0 && (
-        <div>
-          <div className="section-header"><h2>Forms</h2></div>
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {forms.map(form => (
-              <div key={form.zipPath} className="league-card p-3 text-center">
-                <p className="text-league-gold-light text-xs font-beaufort truncate mb-2">{form.skinName}</p>
-                <button
-                  onClick={() => handleApply(form)}
-                  disabled={!form.valid}
-                  className="btn-secondary text-[10px] py-1 w-full"
-                >
-                  Apply
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ══════ EXALTED ══════ */}
-      {exalted.length > 0 && (
-        <div>
-          <div className="section-header"><h2>Exalted</h2></div>
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {exalted.map(ex => (
-              <div key={ex.zipPath} className="league-card p-3 text-center">
-                <p className="text-league-gold-light text-xs font-beaufort truncate mb-2">{ex.skinName}</p>
-                <button
-                  onClick={() => handleApply(ex)}
-                  disabled={!ex.valid}
-                  className="btn-secondary text-[10px] py-1 w-full"
-                >
-                  Apply
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+      {champ.skins.length === 0 && (
+        <div className="text-center py-12 text-league-grey-light">No skins data. Build the library index.</div>
       )}
     </div>
   );

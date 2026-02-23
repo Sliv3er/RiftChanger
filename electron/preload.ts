@@ -6,11 +6,24 @@ contextBridge.exposeInMainWorld('api', {
   maximize: () => ipcRenderer.send('window:maximize'),
   close: () => ipcRenderer.send('window:close'),
 
-  // Skins
+  // Library
+  getLibraryIndex: () => ipcRenderer.invoke('library:getIndex'),
+  buildLibraryIndex: () => ipcRenderer.invoke('library:buildIndex'),
+  setLibraryPath: (p: string) => ipcRenderer.invoke('library:setPath', p),
+  getLibraryPath: () => ipcRenderer.invoke('library:getPath'),
+  onIndexProgress: (cb: (msg: string) => void) => {
+    ipcRenderer.on('library:indexProgress', (_e, msg) => cb(msg));
+  },
+
+  // Apply single skin
+  applySkin: (zipPath: string, skinName: string, champName: string) =>
+    ipcRenderer.invoke('skins:applySingle', zipPath, skinName, champName),
+
+  // Legacy scan
   scanSkins: (path: string) => ipcRenderer.invoke('skins:scan', path),
   validateSkin: (path: string) => ipcRenderer.invoke('skins:validate', path),
 
-  // Skin Updater
+  // Updater
   updateSkins: (path: string) => ipcRenderer.invoke('skins:update', path),
   isGitRepo: (path: string) => ipcRenderer.invoke('skins:isGitRepo', path),
   getLastUpdate: (path: string) => ipcRenderer.invoke('skins:lastUpdate', path),

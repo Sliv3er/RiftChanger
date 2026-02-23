@@ -1,3 +1,42 @@
+export interface LibChampion {
+  id: string;
+  key: string;
+  name: string;
+  title: string;
+  tags: string[];
+  iconUrl: string;
+  skins: LibSkin[];
+}
+
+export interface LibSkin {
+  id: number;
+  num: number;
+  name: string;
+  hasChromas: boolean;
+  splashUrl: string;
+  loadingUrl: string;
+  available: boolean;
+  zipPath: string | null;
+  chromas: LibChroma[];
+}
+
+export interface LibChroma {
+  num: number;
+  name: string;
+  available: boolean;
+  zipPath: string | null;
+  imageUrl: string;
+}
+
+export interface GeneratorProgress {
+  total: number;
+  done: number;
+  current: string;
+  errors: string[];
+  generated: number;
+}
+
+// Legacy types kept for backward compat
 export interface SkinEntry {
   championName: string;
   skinName: string;
@@ -6,12 +45,7 @@ export interface SkinEntry {
   zipPath: string;
   valid: boolean;
   validationErrors: string[];
-  meta: {
-    author: string;
-    description: string;
-    name: string;
-    version: string;
-  } | null;
+  meta: { author: string; description: string; name: string; version: string } | null;
   wadFile: string | null;
 }
 
@@ -26,43 +60,19 @@ export interface ScanResult {
 }
 
 export interface ChampionData {
-  id: string;
-  key: string;
-  name: string;
-  title: string;
-  tags: string[];
-  iconUrl: string;
+  id: string; key: string; name: string; title: string; tags: string[]; iconUrl: string;
 }
 
 export interface SkinData {
-  id: number;
-  num: number;
-  name: string;
-  chromas: boolean;
-  splashUrl: string;
-  loadingUrl: string;
+  id: number; num: number; name: string; chromas: boolean; splashUrl: string; loadingUrl: string;
 }
 
 export interface GameInfo {
-  found: boolean;
-  path: string | null;
-  version: string | null;
-  isRunning: boolean;
+  found: boolean; path: string | null; version: string | null; isRunning: boolean;
 }
 
 export interface BackupEntry {
-  id: string;
-  date: string;
-  gamePath: string;
-  size: number;
-}
-
-export interface GeneratorProgress {
-  total: number;
-  done: number;
-  current: string;
-  errors: string[];
-  generated: number;
+  id: string; date: string; gamePath: string; size: number;
 }
 
 declare global {
@@ -72,11 +82,19 @@ declare global {
       maximize: () => void;
       close: () => void;
 
-      // Skins
+      // Library
+      getLibraryIndex: () => Promise<LibChampion[] | null>;
+      buildLibraryIndex: () => Promise<LibChampion[]>;
+      setLibraryPath: (p: string) => Promise<boolean>;
+      getLibraryPath: () => Promise<string>;
+      onIndexProgress: (cb: (msg: string) => void) => void;
+
+      // Apply
+      applySkin: (zipPath: string, skinName: string, champName: string) => Promise<{ success: boolean; message: string }>;
+
+      // Legacy
       scanSkins: (path: string) => Promise<ScanResult>;
       validateSkin: (path: string) => Promise<SkinEntry>;
-
-      // Skin Updater
       updateSkins: (path: string) => Promise<{ success: boolean; message: string; updated: number }>;
       isGitRepo: (path: string) => Promise<boolean>;
       getLastUpdate: (path: string) => Promise<string | null>;
@@ -116,8 +134,6 @@ declare global {
 
       // Dialog
       selectFolder: () => Promise<string | null>;
-
-      // Shell
       openExternal: (url: string) => void;
     };
   }
