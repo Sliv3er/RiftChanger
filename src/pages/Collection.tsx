@@ -106,12 +106,15 @@ export default function Collection({ champions, scanResult, notify }: Props) {
                 key={c.id}
                 onClick={() => setSelChamp(c)}
                 className={`champ-cell ${selChamp?.id === c.id ? 'selected' : ''}`}
+                title={c.name}
               >
                 <div className="relative aspect-square bg-[#1E2328]">
                   <img src={c.iconUrl} alt={c.name}
                        className="w-full h-full object-cover" loading="lazy" />
+                  {/* Gold frame overlay like League champ select */}
+                  <div className="absolute inset-0 border border-[#463414]/60 pointer-events-none" />
                 </div>
-                <p className="text-[8px] text-center text-[#A09B8C] truncate py-0.5 bg-[#0A1428]">{c.name}</p>
+                <p className="text-[8px] text-center text-[#A09B8C] truncate py-0.5 bg-[#0A1428]/80 leading-none">{c.name}</p>
               </div>
             ))}
           </div>
