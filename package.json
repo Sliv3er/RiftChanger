@@ -1,0 +1,63 @@
+{
+  "name": "riftchanger",
+  "version": "1.0.0",
+  "description": "League of Legends Custom Skin Manager - A premium companion tool for managing and applying custom skins",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && tsc -p tsconfig.electron.json",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sliv3er/RiftChanger.git"
+  },
+  "author": "Sliv3er",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.10",
+    "axios": "^1.6.7",
+    "electron-store": "^8.2.0",
+    "glob": "^10.3.10"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "concurrently": "^8.2.2",
+    "electron": "^28.2.2",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.35",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.1",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.3",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.riftchanger.app",
+    "productName": "RiftChanger",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

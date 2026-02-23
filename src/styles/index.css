@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A1428;
+}
+::-webkit-scrollbar-thumb {
+  background: #463714;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #785A28;
+}
+
+body {
+  font-family: 'Spiegel', 'Segoe UI', sans-serif;
+  background: #010A13;
+  color: #A09B8C;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* League-style gold border accent */
+.league-border {
+  border: 1px solid #463714;
+}
+.league-border-light {
+  border: 1px solid #785A28;
+}
+.league-border-gold {
+  border: 1px solid #C89B3C;
+}
+
+/* Gold text */
+.text-gold {
+  color: #C89B3C;
+}
+.text-gold-light {
+  color: #F0E6D2;
+}
+
+/* Card hover effect */
+.skin-card {
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+.skin-card:hover {
+  border-color: #C89B3C;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(200, 155, 60, 0.2);
+}
+
+/* Button styles */
+.btn-league {
+  background: linear-gradient(180deg, #1E2328 0%, #433d2b 100%);
+  border: 1px solid #C89B3C;
+  color: #C89B3C;
+  padding: 8px 24px;
+  font-family: 'Beaufort for LOL', serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-league:hover {
+  background: linear-gradient(180deg, #433d2b 0%, #1E2328 100%);
+  color: #F0E6D2;
+  box-shadow: 0 0 10px rgba(200, 155, 60, 0.3);
+}
+.btn-league:active {
+  transform: scale(0.98);
+}
+
+.btn-league-primary {
+  background: linear-gradient(180deg, #785A28 0%, #C89B3C 50%, #785A28 100%);
+  border: 1px solid #C89B3C;
+  color: #010A13;
+  padding: 10px 32px;
+  font-family: 'Beaufort for LOL', serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-league-primary:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 0 15px rgba(200, 155, 60, 0.4);
+}
+
+/* Titlebar drag region */
+.titlebar {
+  -webkit-app-region: drag;
+}
+.titlebar button {
+  -webkit-app-region: no-drag;
+}
+
+/* Loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #1E2328 25%, #2a2f35 50%, #1E2328 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Search input */
+.search-input {
+  background: #1E2328;
+  border: 1px solid #463714;
+  color: #F0E6D2;
+  padding: 8px 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-input:focus {
+  border-color: #C89B3C;
+}
+.search-input::placeholder {
+  color: #5B5A56;
+}
