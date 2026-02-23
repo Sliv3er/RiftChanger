@@ -18,8 +18,10 @@ let skinScanner: SkinScanner;
 
 const isDev = !app.isPackaged;
 
-// lol-skins lives inside the project
-const LOL_SKINS_DIR = path.join(__dirname, '..', 'lol-skins');
+// In dev, lol-skins lives in the project. In production, next to the exe.
+const LOL_SKINS_DIR = isDev
+  ? path.join(__dirname, '..', 'lol-skins')
+  : path.join(path.dirname(app.getPath('exe')), 'lol-skins');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
