@@ -2,7 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
 import AdmZip from 'adm-zip';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
 
@@ -96,7 +99,7 @@ export class SkinGenerator {
 
       // 2. Extract game WAD
       const extractDir = path.join(tmpDir, 'extract');
-      execFileSync(this.wadExtractExe, [gameWad, extractDir], {
+      await execFileAsync(this.wadExtractExe, [gameWad, extractDir], {
         timeout: 120000, windowsHide: true, cwd: this.toolsDir,
       });
 
@@ -127,7 +130,7 @@ export class SkinGenerator {
       const wadDir = path.join(tmpDir, 'wad');
       fs.mkdirSync(wadDir, { recursive: true });
       const wadFile = path.join(wadDir, `${championId}.wad.client`);
-      execFileSync(this.wadMakeExe, [rawDir, wadFile, `--game:${this.gamePath}`], {
+      await execFileAsync(this.wadMakeExe, [rawDir, wadFile, `--game:${this.gamePath}`], {
         timeout: 60000, windowsHide: true, cwd: this.toolsDir,
       });
 
@@ -191,7 +194,7 @@ export class SkinGenerator {
     if (fs.existsSync(gameWad)) {
       try {
         const tmpExtract = path.join(require('os').tmpdir(), `rc-chroma-${championId}-${Date.now()}`);
-        execFileSync(this.wadExtractExe, [gameWad, tmpExtract], {
+        await execFileAsync(this.wadExtractExe, [gameWad, tmpExtract], {
           timeout: 120000, windowsHide: true, cwd: this.toolsDir,
         });
 
@@ -273,3 +276,4 @@ export class SkinGenerator {
     return progress;
   }
 }
+
