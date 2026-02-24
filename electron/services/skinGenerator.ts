@@ -21,8 +21,12 @@ export interface GenerateAllProgress {
 }
 
 /**
- * SkinGenerator — extracts actual skin assets from the game WAD using cslol-tools,
- * remaps skinN files to skin0 paths, and packs into a fantome mod.
+ * SkinGenerator — extracts skin bins from the game WAD and packs them as
+ * skin0.bin replacement mods using cslol-tools (wad-extract + wad-make).
+ *
+ * Approach (confirmed working): replace skin0.bin with skinN.bin.
+ * The bin references existing assets by hash, so the game loads
+ * the correct model/textures/particles from the base WAD.
  */
 export class SkinGenerator {
   private outputDir: string;
@@ -36,18 +40,13 @@ export class SkinGenerator {
     this.outputDir = outputDir;
   }
 
-  /**
-   * Must be called before generating — sets paths to cslol-tools.
-   */
   setToolsDir(toolsDir: string) {
     this.toolsDir = toolsDir;
     this.wadExtractExe = path.join(toolsDir, 'wad-extract.exe');
     this.wadMakeExe = path.join(toolsDir, 'wad-make.exe');
   }
 
-  setGamePath(gamePath: string) {
-    this.gamePath = gamePath;
-  }
+  setGamePath(gamePath: string) { this.gamePath = gamePath; }
 
   private get toolsReady(): boolean {
     return !!this.toolsDir && fs.existsSync(this.wadExtractExe) && fs.existsSync(this.wadMakeExe);
@@ -61,7 +60,18 @@ export class SkinGenerator {
   }
 
   /**
-   * Generate a skin mod by extracting real game assets and remapping skinN → skin0.
+   * Known companion/follower characters that also need skin0.bin replaced.
+   */
+  private static COMPANIONS: Record<string, string[]> = {
+    bard: ['bardfollower'],
+    kindred: ['youmus'],  // Kindred's Wolf
+    quinn: ['quinnvalor'], // Quinn's Valor
+    nunu: ['willump'],
+    // Add more as discovered
+  };
+
+  /**
+   * Generate a skin mod: extract skinN.bin from game WAD → pack as skin0.bin.
    */
   async generateSkin(
     championId: string,
@@ -73,136 +83,62 @@ export class SkinGenerator {
     }
 
     const champLower = championId.toLowerCase();
-    const skinStr = `skin${skinNum}`;
     const tmpDir = path.join(require('os').tmpdir(), `rc-gen-${champLower}-${skinNum}-${Date.now()}`);
-    const extractDir = path.join(tmpDir, 'extract');
-    const rawDir = path.join(tmpDir, 'raw');
-    const wadDir = path.join(tmpDir, 'wad');
-    const metaDir = path.join(tmpDir, 'meta');
 
     try {
       fs.mkdirSync(tmpDir, { recursive: true });
 
-      // 1. Find the champion WAD in game files
+      // 1. Find champion WAD
       const gameWad = path.join(this.gamePath, 'DATA', 'FINAL', 'Champions', `${championId}.wad.client`);
       if (!fs.existsSync(gameWad)) {
-        return { success: false, message: `Game WAD not found: ${gameWad}` };
+        return { success: false, message: `Game WAD not found: ${championId}.wad.client` };
       }
 
-      // 2. Extract the game WAD
+      // 2. Extract game WAD
+      const extractDir = path.join(tmpDir, 'extract');
       execFileSync(this.wadExtractExe, [gameWad, extractDir], {
-        timeout: 120000,
-        windowsHide: true,
-        cwd: this.toolsDir,
+        timeout: 120000, windowsHide: true, cwd: this.toolsDir,
       });
 
-      // 3. Find all files belonging to this skin
-      const skinFiles: { srcPath: string; relPath: string }[] = [];
-      const walkDir = (dir: string, relBase: string) => {
-        if (!fs.existsSync(dir)) return;
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-          const full = path.join(dir, entry.name);
-          const rel = relBase ? `${relBase}/${entry.name}` : entry.name;
-          if (entry.isDirectory()) {
-            walkDir(full, rel);
-          } else if (entry.isFile()) {
-            skinFiles.push({ srcPath: full, relPath: rel });
-          }
-        }
-      };
+      // 3. Check skinN.bin exists
+      const skinBin = path.join(extractDir, 'data', 'characters', champLower, 'skins', `skin${skinNum}.bin`);
+      if (!fs.existsSync(skinBin)) {
+        return { success: false, message: `skin${skinNum}.bin not found for ${championId}` };
+      }
 
-      // Collect files from skinN directories + skin bin + animation bin
-      const skinAssetDir = path.join(extractDir, 'assets', 'characters', champLower, 'skins', skinStr);
-      const skinBin = path.join(extractDir, 'data', 'characters', champLower, 'skins', `${skinStr}.bin`);
-      const animBin = path.join(extractDir, 'data', 'characters', champLower, 'animations', `${skinStr}.bin`);
-      const soundDir = path.join(extractDir, 'assets', 'sounds', 'wwise2016', 'sfx', 'characters', champLower, 'skins', skinStr);
+      // 4. Build RAW directory: skinN.bin → skin0.bin
+      const rawDir = path.join(tmpDir, 'raw');
+      const skin0Dir = path.join(rawDir, 'data', 'characters', champLower, 'skins');
+      fs.mkdirSync(skin0Dir, { recursive: true });
+      fs.copyFileSync(skinBin, path.join(skin0Dir, 'skin0.bin'));
 
-      // Asset files (models, textures, particles, animations)
-      if (fs.existsSync(skinAssetDir)) {
-        const prefix = `assets/characters/${champLower}/skins/`;
-        walkDir(skinAssetDir, '');
-        for (const f of skinFiles) {
-          // Remap: skinN/* → skin0/*
-          f.relPath = `${prefix}skin0/${f.relPath}`;
+      // 5. Also handle companion characters (e.g., Bard → bardfollower)
+      const companions = SkinGenerator.COMPANIONS[champLower] || [];
+      for (const comp of companions) {
+        const compBin = path.join(extractDir, 'data', 'characters', comp, 'skins', `skin${skinNum}.bin`);
+        if (fs.existsSync(compBin)) {
+          const compDir = path.join(rawDir, 'data', 'characters', comp, 'skins');
+          fs.mkdirSync(compDir, { recursive: true });
+          fs.copyFileSync(compBin, path.join(compDir, 'skin0.bin'));
         }
       }
 
-      const remappedFiles: { srcPath: string; destPath: string }[] = skinFiles.map(f => ({
-        srcPath: f.srcPath,
-        destPath: f.relPath,
-      }));
-
-      // Skin definition bin → remap to skin0.bin
-      if (fs.existsSync(skinBin)) {
-        remappedFiles.push({
-          srcPath: skinBin,
-          destPath: `data/characters/${champLower}/skins/skin0.bin`,
-        });
-      } else {
-        return { success: false, message: `Skin bin not found for ${skinStr}` };
-      }
-
-      // Animation bin → remap to skin0 animation bin
-      if (fs.existsSync(animBin)) {
-        remappedFiles.push({
-          srcPath: animBin,
-          destPath: `data/characters/${champLower}/animations/skin0.bin`,
-        });
-      }
-
-      // Sound files
-      if (fs.existsSync(soundDir)) {
-        const soundFiles: { srcPath: string; relPath: string }[] = [];
-        const soundPrefix = `assets/sounds/wwise2016/sfx/characters/${champLower}/skins/`;
-        const walkSounds = (dir: string, rel: string) => {
-          for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-            const full = path.join(dir, e.name);
-            const r = rel ? `${rel}/${e.name}` : e.name;
-            if (e.isDirectory()) walkSounds(full, r);
-            else soundFiles.push({ srcPath: full, relPath: r });
-          }
-        };
-        walkSounds(soundDir, '');
-        for (const f of soundFiles) {
-          remappedFiles.push({
-            srcPath: f.srcPath,
-            destPath: `${soundPrefix}skin0/${f.relPath}`,
-          });
-        }
-      }
-
-      if (remappedFiles.length < 2) {
-        return { success: false, message: `Too few files for ${skinName} (${remappedFiles.length})` };
-      }
-
-      // 4. Write remapped files to RAW directory
-      for (const f of remappedFiles) {
-        const dest = path.join(rawDir, f.destPath.replace(/\//g, path.sep));
-        fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.copyFileSync(f.srcPath, dest);
-      }
-
-      // 5. Use wad-make to build the WAD (correct v3.4 + zstd)
+      // 6. Pack WAD using wad-make (correct v3.4 + zstd)
+      const wadDir = path.join(tmpDir, 'wad');
       fs.mkdirSync(wadDir, { recursive: true });
       const wadFile = path.join(wadDir, `${championId}.wad.client`);
       execFileSync(this.wadMakeExe, [rawDir, wadFile, `--game:${this.gamePath}`], {
-        timeout: 60000,
-        windowsHide: true,
-        cwd: this.toolsDir,
+        timeout: 60000, windowsHide: true, cwd: this.toolsDir,
       });
 
-      // 6. Create META/info.json
-      fs.mkdirSync(metaDir, { recursive: true });
-      fs.writeFileSync(path.join(metaDir, 'info.json'), JSON.stringify({
+      // 7. Create fantome ZIP
+      const zip = new AdmZip();
+      zip.addFile('META/info.json', Buffer.from(JSON.stringify({
         Author: 'RiftChanger',
         Description: `${skinName} as default skin`,
         Name: skinName,
         Version: '1.0.0',
-      }, null, 2));
-
-      // 7. Pack as fantome ZIP
-      const zip = new AdmZip();
-      zip.addLocalFile(path.join(metaDir, 'info.json'), 'META');
+      }, null, 2)));
       zip.addLocalFile(wadFile, 'WAD');
 
       const safeChampId = championId.replace(/[<>:"/\\|?*]/g, '_');
@@ -212,7 +148,7 @@ export class SkinGenerator {
       const outputPath = path.join(champDir, `${safeName}.zip`);
       zip.writeZip(outputPath);
 
-      return { success: true, message: `Generated: ${skinName} (${remappedFiles.length} files)`, outputPath };
+      return { success: true, message: `Generated: ${skinName}`, outputPath };
     } catch (e: any) {
       return { success: false, message: `Failed ${skinName}: ${e.message}` };
     } finally {
@@ -237,6 +173,7 @@ export class SkinGenerator {
     );
     const champData = detailRes.data.data[championId];
 
+    // Generate base skins
     for (const skin of champData.skins) {
       if (skin.num === 0) continue;
       const skinName = skin.name === 'default' ? `${champData.name} Default` : skin.name;
@@ -247,23 +184,24 @@ export class SkinGenerator {
       else { failed++; errors.push(result.message); }
     }
 
-    // Chromas: find skin numbers in the game WAD that aren't in DataDragon
+    // Chromas: find extra skin numbers in game WAD not in DataDragon
     const officialNums = new Set(champData.skins.map((s: any) => s.num));
     const gameWad = path.join(this.gamePath, 'DATA', 'FINAL', 'Champions', `${championId}.wad.client`);
+
     if (fs.existsSync(gameWad)) {
       try {
-        const tmpExtract = path.join(require('os').tmpdir(), `rc-chroma-scan-${championId}-${Date.now()}`);
+        const tmpExtract = path.join(require('os').tmpdir(), `rc-chroma-${championId}-${Date.now()}`);
         execFileSync(this.wadExtractExe, [gameWad, tmpExtract], {
           timeout: 120000, windowsHide: true, cwd: this.toolsDir,
         });
+
         const skinsDir = path.join(tmpExtract, 'data', 'characters', championId.toLowerCase(), 'skins');
         if (fs.existsSync(skinsDir)) {
-          const skinBins = fs.readdirSync(skinsDir).filter(f => f.match(/^skin\d+\.bin$/));
+          const skinBins = fs.readdirSync(skinsDir).filter(f => /^skin\d+\.bin$/.test(f));
           for (const bin of skinBins) {
             const num = parseInt(bin.match(/skin(\d+)\.bin/)![1]);
             if (num === 0 || officialNums.has(num)) continue;
 
-            // Find parent skin
             const parentSkin = champData.skins
               .filter((s: any) => s.num < num && s.chromas)
               .sort((a: any, b: any) => b.num - a.num)[0];
@@ -281,10 +219,8 @@ export class SkinGenerator {
               const chromaDir = path.join(this.outputDir, safeChampId, 'chromas', safeSkinName);
               fs.mkdirSync(chromaDir, { recursive: true });
               const dest = path.join(chromaDir, path.basename(result.outputPath));
-              try { fs.renameSync(result.outputPath, dest); } catch {
-                fs.copyFileSync(result.outputPath, dest);
-                fs.unlinkSync(result.outputPath);
-              }
+              try { fs.renameSync(result.outputPath, dest); }
+              catch { fs.copyFileSync(result.outputPath, dest); fs.unlinkSync(result.outputPath); }
               generated++;
             } else if (result.success) {
               generated++;
@@ -316,11 +252,7 @@ export class SkinGenerator {
     const champions = Object.keys(champRes.data.data).sort();
 
     const progress: GenerateAllProgress = {
-      total: champions.length,
-      done: 0,
-      current: '',
-      errors: [],
-      generated: 0,
+      total: champions.length, done: 0, current: '', errors: [], generated: 0,
     };
 
     for (const champId of champions) {
