@@ -17,6 +17,21 @@ let skinGenerator: SkinGenerator;
 let skinScanner: SkinScanner;
 let injector: InjectorService;
 
+function findCslolToolsDir(basePath: string): string | null {
+  const cslolDir = path.join(basePath, 'cslol-manager');
+  if (!fs.existsSync(cslolDir)) return null;
+  const walk = (dir: string, d: number): string | null => {
+    if (d > 4) return null;
+    try {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.isFile() && e.name === 'mod-tools.exe') return dir;
+        if (e.isDirectory()) { const r = walk(path.join(dir, e.name), d + 1); if (r) return r; }
+      }
+    } catch {} return null;
+  };
+  return walk(cslolDir, 0);
+}
+
 const isDev = !app.isPackaged;
 const LOL_SKINS_DIR = isDev
   ? path.join(__dirname, '..', 'lol-skins')
@@ -50,6 +65,11 @@ function initServices() {
   skinScanner = new SkinScanner();
   injector = new InjectorService(ud);
   setWadMakeConfig(ud);
+
+  // Pass cslol-tools dir to generator so it can use wad-extract + wad-make
+  const toolsDir = findCslolToolsDir(ud);
+  if (toolsDir) skinGenerator.setToolsDir(toolsDir);
+
   fs.mkdirSync(LOL_SKINS_DIR, { recursive: true });
 }
 
