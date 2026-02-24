@@ -136,7 +136,7 @@ export class InjectorService {
 
     try {
       await new Promise<void>((resolve, reject) => {
-        execFile(modTools, mkArgs, { timeout: 60000, windowsHide: true }, (err, stdout, stderr) => {
+        execFile(modTools, mkArgs, { timeout: 60000, windowsHide: true, cwd: this.toolsDir }, (err, stdout, stderr) => {
           if (err) {
             const msg = stderr || stdout || err.message;
             reject(new Error(msg));
@@ -149,8 +149,8 @@ export class InjectorService {
       return { success: false, message: `mkoverlay failed: ${e.message.slice(0, 500)}` };
     }
 
-    // Config
-    fs.writeFileSync(this.configFile, JSON.stringify({ gamePath: this.gamePath }));
+    // Config file — must NOT pre-exist; runoverlay creates it as output
+    if (fs.existsSync(this.configFile)) fs.unlinkSync(this.configFile);
 
     // runoverlay — keep stdio so we can monitor and the process stays alive
     try {
@@ -160,7 +160,7 @@ export class InjectorService {
       this.overlayProcess = spawn(
         modTools,
         ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`, '--opts:none'],
-        { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }
+        { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], cwd: this.toolsDir }
       );
 
       this.overlayProcess.stdout?.on('data', (d: Buffer) => {
