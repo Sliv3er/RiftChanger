@@ -159,8 +159,8 @@ export class InjectorService {
 
       this.overlayProcess = spawn(
         modTools,
-        ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`],
-        { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+        ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`, '--opts:none'],
+        { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }
       );
 
       this.overlayProcess.stdout?.on('data', (d: Buffer) => {
@@ -191,7 +191,18 @@ export class InjectorService {
   }
 
   stopOverlay() {
-    if (this.overlayProcess) { try { this.overlayProcess.kill(); } catch {} this.overlayProcess = null; }
+    if (this.overlayProcess) {
+      try {
+        // CSLoL stops the patcher by writing newline to stdin
+        this.overlayProcess.stdin?.write('\n');
+        this.overlayProcess.stdin?.end();
+      } catch {}
+      // Give it a moment to exit gracefully, then force kill
+      setTimeout(() => {
+        try { this.overlayProcess?.kill(); } catch {}
+        this.overlayProcess = null;
+      }, 2000);
+    }
     try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
   }
 
