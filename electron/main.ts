@@ -7,6 +7,7 @@ import { BackupService } from './services/backupService';
 import { SkinGenerator } from './services/skinGenerator';
 import { SkinScanner } from './services/skinScanner';
 import { InjectorService } from './services/injectorService';
+import { setWadMakeConfig } from './services/wadPacker';
 
 let mainWindow: BrowserWindow | null = null;
 let assetService: AssetService;
@@ -48,6 +49,7 @@ function initServices() {
   skinGenerator = new SkinGenerator(LOL_SKINS_DIR);
   skinScanner = new SkinScanner();
   injector = new InjectorService(ud);
+  setWadMakeConfig(ud);
   fs.mkdirSync(LOL_SKINS_DIR, { recursive: true });
 }
 

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
 import AdmZip from 'adm-zip';
-import { packWadWithHashes, WadEntry } from './wadPacker';
+import { packWadWithHashes, WadEntry, setWadMakeConfig } from './wadPacker';
 
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
 const CDRAGON = 'https://raw.communitydragon.org/latest';
