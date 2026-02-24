@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
   listMods: () => ipcRenderer.invoke('injector:listMods'),
   removeMod: (name: string) => ipcRenderer.invoke('injector:removeMod', name),
   removeAllMods: () => ipcRenderer.invoke('injector:removeAll'),
+  overlayStatus: () => ipcRenderer.invoke('injector:status'),
 
   generateChampion: (id: string) => ipcRenderer.invoke('gen:champion', id),
   generateAll: () => ipcRenderer.invoke('gen:all'),

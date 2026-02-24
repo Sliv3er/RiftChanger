@@ -76,6 +76,7 @@ function registerIPC() {
   ipcMain.handle('injector:listMods', () => injector.listMods());
   ipcMain.handle('injector:removeMod', (_e, name: string) => injector.removeMod(name));
   ipcMain.handle('injector:removeAll', () => { injector.removeAllMods(); return true; });
+  ipcMain.handle('injector:status', () => injector.getOverlayStatus());
 
   // Generator
   ipcMain.handle('gen:champion', (_e, id: string) =>

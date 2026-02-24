@@ -6,12 +6,16 @@ export default function Settings({ notify, onRescan }: Props) {
   const [ready, setReady] = useState(false);
   const [mods, setMods] = useState<string[]>([]);
   const [skinPath, setSkinPath] = useState('');
+  const [overlay, setOverlay] = useState<{ running: boolean; log: string }>({ running: false, log: '' });
 
   useEffect(() => {
     if (!window.api) return;
     window.api.injectorReady().then(setReady);
     window.api.listMods().then(setMods);
     window.api.getSkinsPath().then(setSkinPath);
+    window.api.overlayStatus().then(setOverlay);
+    const timer = setInterval(() => window.api.overlayStatus().then(setOverlay), 3000);
+    return () => clearInterval(timer);
   }, []);
 
   return (
@@ -43,6 +47,24 @@ export default function Settings({ notify, onRescan }: Props) {
             const r = await window.api?.injectorSetup();
             if (r) { notify(r.message, r.success); setReady(r.success); }
           }} className="btn-outline">Setup cslol-tools</button>
+        </div>
+
+        {/* Overlay status */}
+        <div style={{ background: '#0A1428', border: '1px solid #1E2328', padding: 20 }}>
+          <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase' as const, marginBottom: 8 }}>
+            Overlay Status
+          </p>
+          <div className="flex items-center gap-2 mb-2">
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: overlay.running ? '#0ACE83' : '#3C3C41' }} />
+            <span style={{ fontSize: 12, color: overlay.running ? '#0ACE83' : '#5B5A56' }}>
+              {overlay.running ? 'Running — waiting for game' : 'Not running'}
+            </span>
+          </div>
+          {overlay.log && (
+            <pre style={{ fontSize: 9, color: '#5B5A56', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 80, overflow: 'auto' }}>
+              {overlay.log.trim()}
+            </pre>
+          )}
         </div>
 
         {/* Active mods */}

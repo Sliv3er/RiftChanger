@@ -9,6 +9,8 @@ import { spawn, execFile, ChildProcess } from 'child_process';
 import axios from 'axios';
 import AdmZip from 'adm-zip';
 
+let overlayLog = ''; // Keep last output for debugging
+
 const CSLOL_RELEASES_API = 'https://api.github.com/repos/LeagueToolkit/cslol-manager/releases/latest';
 
 export class InjectorService {
@@ -150,16 +152,39 @@ export class InjectorService {
     // Config
     fs.writeFileSync(this.configFile, JSON.stringify({ gamePath: this.gamePath }));
 
-    // runoverlay
+    // runoverlay — keep stdio so we can monitor and the process stays alive
     try {
       this.stopOverlay();
+      overlayLog = '';
+
       this.overlayProcess = spawn(
         modTools,
         ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`],
-        { detached: true, stdio: 'ignore', windowsHide: true }
+        { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
       );
-      this.overlayProcess.unref();
-      return { success: true, message: `${mods.length} skin(s) injected! Start a game to see them.` };
+
+      this.overlayProcess.stdout?.on('data', (d: Buffer) => {
+        overlayLog += d.toString();
+        // Keep last 2KB
+        if (overlayLog.length > 2048) overlayLog = overlayLog.slice(-2048);
+      });
+      this.overlayProcess.stderr?.on('data', (d: Buffer) => {
+        overlayLog += d.toString();
+        if (overlayLog.length > 2048) overlayLog = overlayLog.slice(-2048);
+      });
+      this.overlayProcess.on('exit', (code) => {
+        overlayLog += `\n[process exited with code ${code}]`;
+        this.overlayProcess = null;
+      });
+
+      // Wait a moment to make sure it didn't crash immediately
+      await new Promise(r => setTimeout(r, 500));
+
+      if (this.overlayProcess?.exitCode !== null && this.overlayProcess?.exitCode !== undefined) {
+        return { success: false, message: `runoverlay exited immediately: ${overlayLog.trim()}` };
+      }
+
+      return { success: true, message: `${mods.length} skin(s) ready! Overlay waiting for game.` };
     } catch (e: any) {
       return { success: false, message: `runoverlay failed: ${e.message}` };
     }
@@ -185,6 +210,13 @@ export class InjectorService {
     const match = all.find(m => m.includes(name) || name.includes(m));
     if (match) { fs.rmSync(path.join(this.modsDir, match), { recursive: true, force: true }); return true; }
     return false;
+  }
+
+  getOverlayStatus(): { running: boolean; log: string } {
+    return {
+      running: this.overlayProcess !== null && this.overlayProcess.exitCode === null,
+      log: overlayLog,
+    };
   }
 
   removeAllMods() {

@@ -32,6 +32,7 @@ declare global {
       listMods(): Promise<string[]>;
       removeMod(name: string): Promise<boolean>;
       removeAllMods(): Promise<boolean>;
+      overlayStatus(): Promise<{ running: boolean; log: string }>;
       generateChampion(id: string): Promise<{ generated: number; failed: number; errors: string[] }>;
       generateAll(): Promise<any>;
       onGenProgress(cb: (m: string) => void): void;
