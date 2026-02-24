@@ -5,7 +5,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn, execSync, ChildProcess } from 'child_process';
+import { spawn, execFile, ChildProcess } from 'child_process';
 import axios from 'axios';
 import AdmZip from 'adm-zip';
 
@@ -70,7 +70,7 @@ export class InjectorService {
   }
 
   /**
-   * Import a skin .zip — EXTRACT it into a mod folder (not just copy).
+   * Import a skin .zip — EXTRACT it into a mod folder.
    * mod-tools needs: modsDir/<modName>/META/info.json + WAD/*.wad.client
    */
   importMod(zipPath: string, modName: string): { success: boolean; message: string } {
@@ -78,14 +78,11 @@ export class InjectorService {
       const safe = modName.replace(/[<>:"/\\|?*]/g, '_');
       const modDir = path.join(this.modsDir, safe);
 
-      // Clean existing
       if (fs.existsSync(modDir)) fs.rmSync(modDir, { recursive: true, force: true });
 
-      // Extract the fantome/zip into the mod folder
       const zip = new AdmZip(zipPath);
       zip.extractAllTo(modDir, true);
 
-      // Verify structure
       const hasInfo = fs.existsSync(path.join(modDir, 'META', 'info.json'));
       const wadDir = path.join(modDir, 'WAD');
       const hasWad = fs.existsSync(wadDir) && fs.readdirSync(wadDir).some(f => f.endsWith('.wad.client'));
@@ -102,21 +99,19 @@ export class InjectorService {
   }
 
   /**
-   * Build overlay + inject. Full apply pipeline.
+   * Build overlay + inject. Uses execFile (array args) to handle spaces in mod names.
    */
   async apply(modNames?: string[]): Promise<{ success: boolean; message: string }> {
     if (!this.isReady()) return { success: false, message: 'cslol-tools not ready. Go to Settings → Setup.' };
 
     const modTools = path.join(this.toolsDir, 'mod-tools.exe');
 
-    // Get mod folder names (not .fantome files — actual extracted folders)
     let mods: string[];
     if (modNames) {
       mods = modNames.map(m => m.replace('.fantome', '').replace(/[<>:"/\\|?*]/g, '_'));
     } else {
-      // List all directories in mods dir
       mods = fs.readdirSync(this.modsDir, { withFileTypes: true })
-        .filter(e => e.isDirectory())
+        .filter(e => e.isDirectory() && fs.existsSync(path.join(this.modsDir, e.name, 'META', 'info.json')))
         .map(e => e.name);
     }
 
@@ -126,16 +121,30 @@ export class InjectorService {
     if (fs.existsSync(this.overlayDir)) fs.rmSync(this.overlayDir, { recursive: true, force: true });
     fs.mkdirSync(this.overlayDir, { recursive: true });
 
-    // mkoverlay
+    // mkoverlay — use execFile with proper args array (handles spaces correctly)
     const modsArg = mods.join('/');
+    const mkArgs = [
+      'mkoverlay',
+      this.modsDir,
+      this.overlayDir,
+      `--game:${this.gamePath}`,
+      `--mods:${modsArg}`,
+      '--ignoreConflict',
+    ];
+
     try {
-      execSync(
-        `"${modTools}" mkoverlay "${this.modsDir}" "${this.overlayDir}" --game:"${this.gamePath}" --mods:${modsArg} --ignoreConflict`,
-        { timeout: 60000, windowsHide: true }
-      );
+      await new Promise<void>((resolve, reject) => {
+        execFile(modTools, mkArgs, { timeout: 60000, windowsHide: true }, (err, stdout, stderr) => {
+          if (err) {
+            const msg = stderr || stdout || err.message;
+            reject(new Error(msg));
+          } else {
+            resolve();
+          }
+        });
+      });
     } catch (e: any) {
-      const stderr = e.stderr?.toString() || e.stdout?.toString() || e.message;
-      return { success: false, message: `mkoverlay failed: ${stderr.slice(0, 300)}` };
+      return { success: false, message: `mkoverlay failed: ${e.message.slice(0, 500)}` };
     }
 
     // Config
@@ -150,7 +159,7 @@ export class InjectorService {
         { detached: true, stdio: 'ignore', windowsHide: true }
       );
       this.overlayProcess.unref();
-      return { success: true, message: `✅ ${mods.length} skin(s) injected! Start a game to see them.` };
+      return { success: true, message: `${mods.length} skin(s) injected! Start a game to see them.` };
     } catch (e: any) {
       return { success: false, message: `runoverlay failed: ${e.message}` };
     }
@@ -158,7 +167,7 @@ export class InjectorService {
 
   stopOverlay() {
     if (this.overlayProcess) { try { this.overlayProcess.kill(); } catch {} this.overlayProcess = null; }
-    try { execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
+    try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
   }
 
   listMods(): string[] {
@@ -172,7 +181,6 @@ export class InjectorService {
     const safe = name.replace(/[<>:"/\\|?*]/g, '_');
     const dir = path.join(this.modsDir, safe);
     if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); return true; }
-    // Fuzzy match
     const all = this.listMods();
     const match = all.find(m => m.includes(name) || name.includes(m));
     if (match) { fs.rmSync(path.join(this.modsDir, match), { recursive: true, force: true }); return true; }

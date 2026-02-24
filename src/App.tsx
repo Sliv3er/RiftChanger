@@ -16,7 +16,7 @@ export default function App() {
 
   const notify = useCallback((msg: string, ok = true) => {
     setToast({ msg, ok });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 3500);
   }, []);
 
   useEffect(() => {
@@ -37,36 +37,35 @@ export default function App() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-[#010A13] overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#010A13' }}>
       <Titlebar />
 
-      {/* Nav */}
-      <div className="flex items-center bg-[#010A13] border-b border-[#1E2328]/50 px-4 flex-shrink-0">
+      {/* Nav bar */}
+      <div className="lol-nav flex-shrink-0">
         {(['collection', 'generator', 'settings'] as Page[]).map(p => (
           <button key={p} onClick={() => setPage(p)}
-            className={`nav-tab ${page === p ? 'active' : ''}`}>
-            {p === 'collection' ? '⚔ Collection' : p === 'generator' ? '⚙ Generator' : '☰ Settings'}
+            className={`lol-nav-tab ${page === p ? 'active' : ''}`}>
+            {p === 'collection' ? 'COLLECTION' : p === 'generator' ? 'GENERATOR' : 'SETTINGS'}
           </button>
         ))}
         <div className="flex-1" />
-        <span className="text-[9px] text-[#5B5A56] tracking-[0.15em] font-beaufort">PATCH {patch}</span>
+        <span style={{ fontSize: 9, color: '#5B5A56', letterSpacing: '0.15em' }}>
+          PATCH {patch}
+        </span>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {page === 'collection' && (
-          <Collection champions={champions} scanResult={scanResult} notify={notify} />
-        )}
+        {page === 'collection' && <Collection champions={champions} scanResult={scanResult} notify={notify} />}
         {page === 'generator' && <Generator notify={notify} onDone={rescan} />}
         {page === 'settings' && <Settings notify={notify} onRescan={rescan} />}
       </div>
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 text-sm animate-slide-up ${
-          toast.ok ? 'bg-[#0A3C2E] border border-[#0ACE83]/40 text-[#0ACE83]'
-                   : 'bg-[#3C1A1A] border border-[#C24B4B]/40 text-[#C24B4B]'
-        }`}>{toast.msg}</div>
+        <div className={`toast ${toast.ok ? 'toast-ok' : 'toast-err'}`}>
+          {toast.msg}
+        </div>
       )}
     </div>
   );

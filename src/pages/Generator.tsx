@@ -25,50 +25,62 @@ export default function Generator({ notify, onDone }: Props) {
     setSingleMsg('Generating...');
     try {
       const r = await window.api.generateChampion(single);
-      setSingleMsg(`✅ ${r.generated} generated`); notify(`${single}: ${r.generated}`, true); onDone();
-    } catch (e: any) { setSingleMsg(`❌ ${e.message}`); }
+      setSingleMsg(`Done — ${r.generated} generated`); notify(`${single}: ${r.generated}`, true); onDone();
+    } catch (e: any) { setSingleMsg(`Error: ${e.message}`); }
   };
 
   const pct = progress ? Math.round((progress.done / Math.max(progress.total, 1)) * 100) : 0;
 
   return (
-    <div className="h-full overflow-y-auto p-8">
-      <div className="max-w-xl mx-auto space-y-6">
-        <h1 className="font-beaufort text-xl text-[#C8AA6E] tracking-widest uppercase">Generator</h1>
+    <div className="h-full overflow-y-auto p-8" style={{ background: '#010A13' }}>
+      <div className="max-w-xl mx-auto space-y-5">
+        <h1 style={{ fontSize: 14, fontWeight: 600, color: '#C8AA6E', letterSpacing: '0.2em', textTransform: 'uppercase' as const }}>
+          Skin Generator
+        </h1>
 
-        <div className="bg-[#0A1428] border border-[#1E2328] p-5 space-y-3">
-          <p className="text-[#A09B8C] text-xs uppercase tracking-widest font-beaufort">Single Champion</p>
+        {/* Single champion */}
+        <div style={{ background: '#0A1428', border: '1px solid #1E2328', padding: 20 }}>
+          <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase' as const, marginBottom: 10 }}>
+            Single Champion
+          </p>
           <div className="flex gap-2">
             <input value={single} onChange={e => setSingle(e.target.value)}
-                   placeholder="e.g. Ahri"
-                   className="flex-1 px-3 py-2 bg-[#1E2328] border border-[#3C3C41] text-[#F0E6D2] text-xs outline-none focus:border-[#C8AA6E]/40 placeholder-[#5B5A56]" />
-            <button onClick={genSingle} disabled={!single} className="btn-gold">Go</button>
+              placeholder="e.g. Ahri"
+              className="lol-search flex-1" style={{ paddingLeft: 10 }} />
+            <button onClick={genSingle} disabled={!single} className="btn-gold">Generate</button>
           </div>
-          {singleMsg && <p className="text-xs text-[#C8AA6E]">{singleMsg}</p>}
+          {singleMsg && <p style={{ fontSize: 11, color: '#C8AA6E', marginTop: 8 }}>{singleMsg}</p>}
         </div>
 
-        <div className="bg-[#0A1428] border border-[#1E2328] p-5 space-y-4">
-          <p className="text-[#A09B8C] text-xs uppercase tracking-widest font-beaufort">Generate All</p>
-          <p className="text-[#5B5A56] text-xs">Downloads from CDragon. ~30-60 min.</p>
+        {/* Generate all */}
+        <div style={{ background: '#0A1428', border: '1px solid #1E2328', padding: 20 }}>
+          <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase' as const, marginBottom: 6 }}>
+            Generate All Champions
+          </p>
+          <p style={{ fontSize: 11, color: '#5B5A56', marginBottom: 12 }}>
+            Downloads skin bins from CDragon and packs WADs. Takes 30-60 minutes.
+          </p>
           <button onClick={genAll} disabled={status === 'running'} className="btn-gold">
-            {status === 'running' ? '⏳ Running...' : '⚡ Generate All'}
+            {status === 'running' ? 'Running...' : 'Generate All'}
           </button>
 
           {progress && (
-            <div className="space-y-2 animate-fade">
-              <div className="flex justify-between text-[10px]">
-                <span className="text-[#C8AA6E] truncate mr-4">{progress.current}</span>
-                <span className="text-[#5B5A56]">{progress.done}/{progress.total}</span>
+            <div className="mt-4 space-y-2 anim-fade">
+              <div className="flex justify-between" style={{ fontSize: 10 }}>
+                <span style={{ color: '#C8AA6E' }} className="truncate mr-4">{progress.current}</span>
+                <span style={{ color: '#5B5A56' }}>{progress.done}/{progress.total}</span>
               </div>
-              <div className="progress-bar"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
-              <div className="flex justify-between text-[10px]">
-                <span className="text-[#0ACE83]">{progress.generated} generated</span>
-                <span className="text-[#C8AA6E]">{pct}%</span>
-                {progress.errors?.length > 0 && <span className="text-[#C24B4B]">{progress.errors.length} errors</span>}
+              <div className="lol-progress">
+                <div className="lol-progress-fill" style={{ width: `${pct}%` }} />
+              </div>
+              <div className="flex justify-between" style={{ fontSize: 10 }}>
+                <span style={{ color: '#0ACE83' }}>{progress.generated} generated</span>
+                <span style={{ color: '#C8AA6E' }}>{pct}%</span>
+                {progress.errors?.length > 0 && <span style={{ color: '#C24B4B' }}>{progress.errors.length} errors</span>}
               </div>
             </div>
           )}
-          {status === 'done' && <p className="text-[#0ACE83] text-xs">✅ Complete</p>}
+          {status === 'done' && <p style={{ fontSize: 11, color: '#0ACE83', marginTop: 8 }}>Complete</p>}
         </div>
       </div>
     </div>

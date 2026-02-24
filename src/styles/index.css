@@ -1,125 +1,271 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --gold: #C8AA6E; --gold-bright: #C89B3C; --gold-light: #F0E6D2; --gold-dark: #785A28;
-  --blue-dark: #010A13; --blue-deeper: #0A1428; --blue-deep: #0A323C;
-  --blue-medium: #0397AB; --blue-light: #0AC8B9;
+  --gold: #C8AA6E;
+  --gold-bright: #F0E6D2;
+  --gold-dark: #785A28;
+  --blue-1: #010A13;
+  --blue-2: #0A1428;
+  --blue-3: #1E2328;
+  --grey: #A09B8C;
+  --grey-dark: #5B5A56;
+  --grey-darker: #3C3C41;
+  --teal: #0AC8B9;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #root {
   height: 100%; overflow: hidden;
-  background: #010A13; color: #F0E6D2;
-  font-family: 'Inter', system-ui, sans-serif; font-size: 13px;
+  background: var(--blue-1); color: var(--gold-bright);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  user-select: none;
 }
 
-.font-beaufort { font-family: 'Cinzel', serif; letter-spacing: 0.05em; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
+/* Scrollbar — thin, subtle */
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #785A28; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #463714; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dark); }
 
-/* Titlebar drag */
+/* Titlebar */
 .drag-region { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 
-/* Selection */
-::selection { background: rgba(200,170,110,0.3); }
+::selection { background: rgba(200,170,110,0.25); }
 
-@layer components {
-  /* LOCK IN button - hexagonal like League */
-  .btn-lockin {
-    @apply relative px-12 py-3.5 font-beaufort font-bold text-base uppercase tracking-[0.3em]
-           text-league-blue-darkest cursor-pointer transition-all duration-300;
-    background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
-    clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%);
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-  }
-  .btn-lockin:hover {
-    background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%);
-    box-shadow: 0 0 40px rgba(200,170,110,0.6), 0 0 80px rgba(200,170,110,0.2);
-    transform: scale(1.04);
-    filter: brightness(1.1);
-  }
-  .btn-lockin:active {
-    transform: scale(0.98);
-    background: linear-gradient(180deg, #785A28 0%, #463414 100%);
-  }
-  .btn-lockin:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; filter: none; }
+/* ═══════════════════════════════════════════
+   LEAGUE CLIENT CHAMPION SELECT STYLES
+   ═══════════════════════════════════════════ */
 
-  .btn-gold {
-    @apply px-4 py-2 font-beaufort text-xs uppercase tracking-widest
-           text-league-blue-darkest cursor-pointer transition-all;
-    background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
-  }
-  .btn-gold:hover { background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%); }
+/* Navigation tabs — League top bar style */
+.lol-nav {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  background: linear-gradient(180deg, #1E2328 0%, #010A13 100%);
+  border-bottom: 1px solid #463714;
+  padding: 0 12px;
+}
+.lol-nav-tab {
+  padding: 0 20px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--grey);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  border-bottom: 2px solid transparent;
+  position: relative;
+}
+.lol-nav-tab:hover { color: var(--gold-bright); }
+.lol-nav-tab.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
 
-  .btn-dark {
-    @apply px-4 py-1.5 text-xs uppercase tracking-wider
-           text-league-gold border border-league-gold/30 bg-transparent cursor-pointer transition-all;
-  }
-  .btn-dark:hover { @apply border-league-gold/60 bg-league-gold/10; }
+/* Search input — League style */
+.lol-search {
+  background: rgba(30, 35, 40, 0.8);
+  border: 1px solid var(--grey-darker);
+  color: var(--gold-bright);
+  font-size: 12px;
+  padding: 6px 12px 6px 32px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 220px;
+}
+.lol-search::placeholder { color: var(--grey-dark); }
+.lol-search:focus { border-color: var(--gold-dark); }
 
-  /* Champ select grid item */
-  .champ-cell {
-    @apply relative cursor-pointer transition-all duration-200 overflow-hidden;
-    border: 1px solid transparent;
-  }
-  .champ-cell:hover { border-color: rgba(200,170,110,0.6); z-index: 1; transform: scale(1.08); }
-  .champ-cell.selected { border-color: #C89B3C; box-shadow: 0 0 12px rgba(200,170,110,0.4); z-index: 2; }
-  .champ-cell.dimmed { opacity: 0.35; filter: grayscale(0.5); }
-  .champ-cell.dimmed:hover { opacity: 0.8; filter: none; }
+/* Champion grid tile */
+.champ-tile {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  background: var(--blue-3);
+}
+.champ-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease;
+}
+.champ-tile:hover {
+  border-color: var(--gold);
+  z-index: 1;
+}
+.champ-tile:hover img { transform: scale(1.08); }
+.champ-tile.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 8px rgba(200,170,110,0.4), inset 0 0 12px rgba(200,170,110,0.1);
+}
+.champ-tile .champ-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 0;
+  font-size: 9px;
+  text-align: center;
+  color: var(--grey);
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.champ-tile.dimmed { opacity: 0.3; filter: grayscale(0.6); }
+.champ-tile.dimmed:hover { opacity: 0.8; filter: none; }
 
-  /* Skin card in the bottom strip */
-  .skin-thumb {
-    @apply relative cursor-pointer transition-all duration-300 flex-shrink-0 overflow-hidden;
-    border: 2px solid transparent;
-  }
-  .skin-thumb:hover { border-color: rgba(200,170,110,0.5); }
-  .skin-thumb.active { border-color: #C89B3C; box-shadow: 0 0 15px rgba(200,170,110,0.3); }
+/* Skin carousel thumbnail — bottom strip */
+.skin-card {
+  flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+  background: #0A0E13;
+}
+.skin-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.skin-card:hover { border-color: rgba(200,170,110,0.5); }
+.skin-card.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(200,170,110,0.35);
+}
+.skin-card .skin-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 3px 4px;
+  font-size: 8px;
+  color: var(--grey);
+  background: linear-gradient(transparent, rgba(0,0,0,0.9));
+  text-align: center;
+  line-height: 1.1;
+}
+.skin-card.active .skin-label { color: var(--gold); }
+.skin-card .avail-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
 
-  /* Chroma dot */
-  .chroma-dot {
-    @apply w-5 h-5 rounded-full cursor-pointer border-2 border-transparent transition-all;
-  }
-  .chroma-dot:hover { @apply border-white/60 scale-110; }
-  .chroma-dot.active { @apply border-league-gold scale-110; box-shadow: 0 0 8px rgba(200,170,110,0.5); }
+/* LOCK IN button — hex shape like League */
+.btn-lockin {
+  position: relative;
+  padding: 10px 48px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--blue-1);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%);
+}
+.btn-lockin:hover {
+  background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%);
+  filter: brightness(1.15);
+  transform: scale(1.03);
+}
+.btn-lockin:active { transform: scale(0.97); }
+.btn-lockin:disabled { opacity: 0.35; cursor: not-allowed; transform: none; filter: none; }
 
-  /* Progress bar */
-  .progress-bar {
-    @apply relative w-full h-1.5 bg-league-grey-dark overflow-hidden;
-  }
-  .progress-fill {
-    @apply h-full transition-all duration-500;
-    background: linear-gradient(90deg, #785A28, #C89B3C, #C8AA6E);
-  }
+/* Chroma circles */
+.chroma-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chroma-circle:hover { border-color: rgba(255,255,255,0.5); transform: scale(1.15); }
+.chroma-circle.active { border-color: var(--gold); box-shadow: 0 0 6px rgba(200,170,110,0.5); }
 
-  /* Tab style nav */
-  .nav-tab {
-    @apply px-5 py-2 text-xs font-beaufort uppercase tracking-[0.2em] cursor-pointer
-           transition-all border-b-2 border-transparent text-league-grey-light;
-  }
-  .nav-tab:hover { @apply text-league-gold/80 border-league-gold/30; }
-  .nav-tab.active { @apply text-league-gold border-league-gold bg-league-gold/5; }
+/* Gold button (settings, etc) */
+.btn-gold {
+  padding: 7px 18px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue-1);
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
+  transition: all 0.2s;
+}
+.btn-gold:hover { background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%); }
+.btn-gold:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-outline {
+  padding: 6px 16px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--gold-dark);
+  transition: all 0.2s;
+}
+.btn-outline:hover { border-color: var(--gold); background: rgba(200,170,110,0.08); }
+
+/* Progress */
+.lol-progress {
+  height: 4px;
+  background: var(--grey-darker);
+  overflow: hidden;
+  position: relative;
+}
+.lol-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold), var(--gold-dark));
+  transition: width 0.4s ease;
 }
 
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-.animate-fade { animation: fadeIn 0.3s ease-out; }
-.animate-slide-up { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.anim-fade { animation: fadeIn 0.25s ease; }
+.anim-slide { animation: slideUp 0.3s ease; }
 
-/* Gold shimmer text */
-.gold-shimmer {
-  background: linear-gradient(90deg, #785A28, #C89B3C, #C8AA6E, #C89B3C, #785A28);
-  background-size: 200% auto;
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  animation: shimmer 3s ease-in-out infinite;
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  padding: 10px 24px;
+  font-size: 12px;
+  animation: slideUp 0.3s ease;
+  border: 1px solid;
 }
-@keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+.toast-ok { background: #0A2E1E; border-color: rgba(10,200,131,0.4); color: #0ACE83; }
+.toast-err { background: #2E1A1A; border-color: rgba(194,75,75,0.4); color: #C24B4B; }
