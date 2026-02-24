@@ -48,7 +48,7 @@ export class SkinGenerator {
 
   setGamePath(gamePath: string) { this.gamePath = gamePath; }
 
-  private get toolsReady(): boolean {
+  get toolsReady(): boolean {
     return !!this.toolsDir && fs.existsSync(this.wadExtractExe) && fs.existsSync(this.wadMakeExe);
   }
 

@@ -101,10 +101,29 @@ function registerIPC() {
   ipcMain.handle('injector:status', () => injector.getOverlayStatus());
 
   // Generator
-  ipcMain.handle('gen:champion', (_e, id: string) =>
-    skinGenerator.generateChampion(id, m => mainWindow?.webContents.send('gen:progress', m)));
-  ipcMain.handle('gen:all', () =>
-    skinGenerator.generateAll(p => mainWindow?.webContents.send('gen:allProgress', p)));
+  ipcMain.handle('gen:champion', async (_e, id: string) => {
+    try {
+      // Ensure tools are found (may have been set up after init)
+      if (!skinGenerator.toolsReady) {
+        const td = findCslolToolsDir(app.getPath('userData'));
+        if (td) skinGenerator.setToolsDir(td);
+      }
+      return await skinGenerator.generateChampion(id, m => mainWindow?.webContents.send('gen:progress', m));
+    } catch (e: any) {
+      return { generated: 0, failed: 1, errors: [e.message] };
+    }
+  });
+  ipcMain.handle('gen:all', async () => {
+    try {
+      if (!skinGenerator.toolsReady) {
+        const td = findCslolToolsDir(app.getPath('userData'));
+        if (td) skinGenerator.setToolsDir(td);
+      }
+      return await skinGenerator.generateAll(p => mainWindow?.webContents.send('gen:allProgress', p));
+    } catch (e: any) {
+      return { total: 0, done: 0, current: '', errors: [e.message], generated: 0 };
+    }
+  });
 
   ipcMain.handle('selectFolder', async () => {
     const r = await dialog.showOpenDialog(mainWindow!, { properties: ['openDirectory'] });
