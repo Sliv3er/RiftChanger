@@ -54,11 +54,17 @@ export default function App() {
         </span>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        {page === 'collection' && <Collection champions={champions} scanResult={scanResult} notify={notify} />}
-        {page === 'generator' && <Generator notify={notify} onDone={rescan} />}
-        {page === 'settings' && <Settings notify={notify} onRescan={rescan} />}
+      {/* Content — Generator stays mounted to preserve generation state */}
+      <div className="flex-1 overflow-hidden relative">
+        <div className={`absolute inset-0 ${page === 'collection' ? '' : 'hidden'}`}>
+          <Collection champions={champions} scanResult={scanResult} notify={notify} />
+        </div>
+        <div className={`absolute inset-0 ${page === 'generator' ? '' : 'hidden'}`}>
+          <Generator notify={notify} onDone={rescan} />
+        </div>
+        <div className={`absolute inset-0 ${page === 'settings' ? '' : 'hidden'}`}>
+          <Settings notify={notify} onRescan={rescan} />
+        </div>
       </div>
 
       {/* Toast */}

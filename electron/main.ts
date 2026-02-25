@@ -141,7 +141,16 @@ app.whenReady().then(() => { initServices(); registerIPC(); createWindow(); });
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (!mainWindow) createWindow(); });
 app.on('before-quit', () => {
-  // Stop overlay and clean up mods so skins don't stay applied after closing
+  // Stop overlay and clean up everything so skins don't stay applied after closing
   try { injector?.stopOverlay(); } catch {}
   try { injector?.removeAllMods(); } catch {}
+  // Force kill any leftover mod-tools processes
+  try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
+});
+
+// Also handle window close directly
+app.on('will-quit', () => {
+  try { injector?.stopOverlay(); } catch {}
+  try { injector?.removeAllMods(); } catch {}
+  try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
 });
