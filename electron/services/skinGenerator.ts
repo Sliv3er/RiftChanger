@@ -21,32 +21,55 @@ function fnv1a(s: string): number {
 
 /**
  * Patch a skin .bin file: replace all skinN references with skin0.
- * This patches:
- * 1. Entry hashes (fnv1a of 'characters/<char>/skins/skinN')
- * 2. Animation link hashes (fnv1a of 'characters/<char>/animations/skinN')
- * 3. Linked file strings in the PROP header (e.g. 'Skin14' → 'Skin0')
- * 4. Same patterns for all sub-characters found in the WAD
+ * Only FNV1a uint32 hashes are patched — NO string replacement.
+ * Confirmed correct by binary diff of working T1 Bard mod (3 hash diffs, 0 string diffs).
+ * Patches entry name hashes, animation hashes, resources hashes, and any
+ * hash dictionary entries for all sub-characters found in the WAD.
  */
 function patchBinForSkin0(bin: Buffer, skinNum: number, wadCharacters: string[]): Buffer {
   const patched = Buffer.from(bin);
   const skinStr = skinNum.toString();
 
-  // Build hash replacement map for ALL characters in the WAD
+  // Build hash replacement map using the binentries hash dictionary.
+  // This covers ALL known entry paths: skins, animations, particles, resources, etc.
   const hashMap = new Map<number, number>();
-  for (const c of wadCharacters) {
-    // Skins entry hash
-    hashMap.set(
-      fnv1a(`characters/${c}/skins/skin${skinStr}`),
-      fnv1a(`characters/${c}/skins/skin0`)
-    );
-    // Animations entry hash
-    hashMap.set(
-      fnv1a(`characters/${c}/animations/skin${skinStr}`),
-      fnv1a(`characters/${c}/animations/skin0`)
-    );
+  const skinRegex = new RegExp(`skin${skinStr}(?!\\d)`, 'gi');
+
+  // Load binentries hash dictionary if available
+  const hashFilePaths = [
+    path.join(path.dirname(path.dirname(__dirname)), 'ritobin', 'bin', 'hashes', 'hashes.binentries.txt'),
+    path.join(process.env.APPDATA || '', 'riftchanger', 'ritobin', 'bin', 'hashes', 'hashes.binentries.txt'),
+  ];
+  let hashFileLoaded = false;
+  for (const hfp of hashFilePaths) {
+    if (!fs.existsSync(hfp)) continue;
+    const lines = fs.readFileSync(hfp, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      if (!line.includes(`kin${skinStr}`)) continue; // quick filter
+      const m = line.match(/^([0-9a-f]+)\s+(.+)/i);
+      if (!m) continue;
+      const entryHash = parseInt(m[1], 16);
+      const entryPath = m[2].trim().toLowerCase();
+      const newPath = entryPath.replace(skinRegex, 'skin0');
+      if (newPath !== entryPath) {
+        hashMap.set(entryHash, fnv1a(newPath));
+      }
+    }
+    hashFileLoaded = true;
+    break;
   }
 
-  // Binary search-and-replace for all hash pairs
+  // Always add the core patterns (in case hash file is missing)
+  for (const c of wadCharacters) {
+    hashMap.set(fnv1a(`characters/${c}/skins/skin${skinStr}`), fnv1a(`characters/${c}/skins/skin0`));
+    hashMap.set(fnv1a(`characters/${c}/animations/skin${skinStr}`), fnv1a(`characters/${c}/animations/skin0`));
+    hashMap.set(fnv1a(`characters/${c}/skins/skin${skinStr}/resources`), fnv1a(`characters/${c}/skins/skin0/resources`));
+  }
+
+  // Binary search-and-replace for all hash pairs.
+  // This is the ONLY patching needed — confirmed by comparing working T1 Bard mod
+  // against original bin (only 3 uint32 diffs, zero string changes).
+  // DO NOT touch PROP header strings or embedded strings — doing so corrupts the file.
   const newBuf = Buffer.alloc(4);
   for (let i = 0; i <= patched.length - 4; i++) {
     const val = patched.readUInt32LE(i);
@@ -54,49 +77,6 @@ function patchBinForSkin0(bin: Buffer, skinNum: number, wadCharacters: string[])
     if (replacement !== undefined) {
       newBuf.writeUInt32LE(replacement);
       newBuf.copy(patched, i);
-    }
-  }
-
-  // Patch linked file strings in PROP header
-  // Format: 'PROP' (4) + version (4) + [if v>=2: linkedCount (4) + strings]
-  // Strings are length-prefixed (uint16 LE + ascii bytes).
-  // Since replacing skinN with skin0 can change string length, we rebuild the entire header.
-  if (patched.length > 12 && patched.toString('ascii', 0, 4) === 'PROP') {
-    const version = patched.readUInt32LE(4);
-    if (version >= 2) {
-      const linkedCount = patched.readUInt32LE(8);
-      let off = 12;
-      const strings: string[] = [];
-      let headerEnd = 12;
-      for (let i = 0; i < linkedCount && off < patched.length - 2; i++) {
-        const strLen = patched.readUInt16LE(off);
-        off += 2;
-        if (off + strLen > patched.length) break;
-        strings.push(patched.toString('ascii', off, off + strLen));
-        off += strLen;
-      }
-      headerEnd = off;
-
-      // Only patch EXCLUSIVE linked files (e.g. Animations/Skin14.bin)
-      // Don't patch shared multi-skin files (they list multiple skins and are valid)
-      const skinPattern = new RegExp(`Skin${skinStr}(?!\\d)`, 'g');
-      const skinPatternLower = new RegExp(`skin${skinStr}(?!\\d)`, 'g');
-      const patchedStrings = strings.map(s => {
-        return s.replace(skinPattern, 'Skin0').replace(skinPatternLower, 'skin0');
-      });
-
-      // Rebuild the header section
-      const parts: Buffer[] = [];
-      parts.push(patched.subarray(0, 12)); // PROP + version + linkedCount
-      for (const s of patchedStrings) {
-        const lenBuf = Buffer.alloc(2);
-        lenBuf.writeUInt16LE(s.length);
-        parts.push(lenBuf);
-        parts.push(Buffer.from(s, 'ascii'));
-      }
-      parts.push(patched.subarray(headerEnd)); // rest of the file
-
-      return Buffer.concat(parts);
     }
   }
 
@@ -211,27 +191,23 @@ export class SkinGenerator {
             .map(e => e.name)
         : [champLower];
 
-      // 5. Build RAW directory: patch skinN.bin → skin0.bin
+      // 5. Build RAW directory: patch skinN bins → skin0 bins
       const rawDir = path.join(tmpDir, 'raw');
-      const skin0Dir = path.join(rawDir, 'data', 'characters', champLower, 'skins');
-      fs.mkdirSync(skin0Dir, { recursive: true });
 
-      // Patch the bin: replace all skinN hashes/references with skin0
-      const skinBinData = fs.readFileSync(skinBin);
-      const patchedBin = patchBinForSkin0(skinBinData, skinNum, wadCharacters);
-      fs.writeFileSync(path.join(skin0Dir, 'skin0.bin'), patchedBin);
-
-      // 6. Also handle companion/sub characters (auto-detected from WAD)
-      for (const comp of wadCharacters) {
-        if (comp === champLower) continue;
-        const compBin = path.join(extractDir, 'data', 'characters', comp, 'skins', `skin${skinNum}.bin`);
-        if (fs.existsSync(compBin)) {
-          const compDir = path.join(rawDir, 'data', 'characters', comp, 'skins');
-          fs.mkdirSync(compDir, { recursive: true });
-          const compBinData = fs.readFileSync(compBin);
-          const patchedCompBin = patchBinForSkin0(compBinData, skinNum, wadCharacters);
-          fs.writeFileSync(path.join(compDir, 'skin0.bin'), patchedCompBin);
+      // Process ALL characters in the WAD (main champ + sub-characters)
+      for (const charName of wadCharacters) {
+        // Patch skins/skinN.bin → skins/skin0.bin
+        const skinBinPath = path.join(extractDir, 'data', 'characters', charName, 'skins', `skin${skinNum}.bin`);
+        if (fs.existsSync(skinBinPath)) {
+          const outDir = path.join(rawDir, 'data', 'characters', charName, 'skins');
+          fs.mkdirSync(outDir, { recursive: true });
+          const binData = fs.readFileSync(skinBinPath);
+          const patched = patchBinForSkin0(binData, skinNum, wadCharacters);
+          fs.writeFileSync(path.join(outDir, 'skin0.bin'), patched);
         }
+
+        // Note: animation bins are NOT included — the game loads them from the
+        // base WAD via linked file references in the skin bin.
       }
 
       // 6. Pack WAD using wad-make (correct v3.4 + zstd)

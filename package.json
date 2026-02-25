@@ -54,12 +54,22 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.png",
+      "icon": "build/icon.ico",
       "requestedExecutionLevel": "requireAdministrator"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "RiftChanger",
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "RiftChanger-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "installerHeaderIcon": "build/icon.ico"
     }
   }
 }
