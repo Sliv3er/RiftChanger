@@ -66,8 +66,18 @@ function initServices() {
   injector = new InjectorService(ud);
   setWadMakeConfig(ud);
 
-  // Pass cslol-tools dir to generator so it can use wad-extract + wad-make
-  const toolsDir = findCslolToolsDir(ud);
+  // Pass cslol-tools dir to generator — check multiple locations
+  let toolsDir = findCslolToolsDir(ud);
+  if (!toolsDir) {
+    // Check standalone CSLoL Manager locations
+    const standalones = [
+      path.join(process.env.USERPROFILE || '', 'Downloads', 'cslol-manager', 'cslol-tools'),
+      path.join(process.env.LOCALAPPDATA || '', 'cslol-manager', 'cslol-tools'),
+    ];
+    for (const sd of standalones) {
+      if (fs.existsSync(path.join(sd, 'mod-tools.exe'))) { toolsDir = sd; break; }
+    }
+  }
   if (toolsDir) skinGenerator.setToolsDir(toolsDir);
 
   fs.mkdirSync(LOL_SKINS_DIR, { recursive: true });
