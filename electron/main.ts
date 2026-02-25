@@ -103,14 +103,20 @@ function registerIPC() {
   // Generator
   ipcMain.handle('gen:champion', async (_e, id: string) => {
     try {
-      // Ensure tools are found (may have been set up after init)
       if (!skinGenerator.toolsReady) {
         const td = findCslolToolsDir(app.getPath('userData'));
         if (td) skinGenerator.setToolsDir(td);
       }
-      return await skinGenerator.generateChampion(id, m => mainWindow?.webContents.send('gen:progress', m));
+      const result = await skinGenerator.generateChampion(id, m => {
+        try { mainWindow?.webContents.send('gen:progress', m); } catch {}
+      });
+      // Send explicit done event
+      try { mainWindow?.webContents.send('gen:championDone', result); } catch {}
+      return result;
     } catch (e: any) {
-      return { generated: 0, failed: 1, errors: [e.message] };
+      const result = { generated: 0, failed: 1, errors: [e.message] };
+      try { mainWindow?.webContents.send('gen:championDone', result); } catch {}
+      return result;
     }
   });
   ipcMain.handle('gen:all', async () => {
@@ -134,4 +140,8 @@ function registerIPC() {
 app.whenReady().then(() => { initServices(); registerIPC(); createWindow(); });
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (!mainWindow) createWindow(); });
-app.on('before-quit', () => { injector?.stopOverlay(); });
+app.on('before-quit', () => {
+  // Stop overlay and clean up mods so skins don't stay applied after closing
+  try { injector?.stopOverlay(); } catch {}
+  try { injector?.removeAllMods(); } catch {}
+});

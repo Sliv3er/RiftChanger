@@ -42,6 +42,22 @@ export default function Generator({ notify, onDone }: Props) {
   // Listen for single champion progress
   useEffect(() => { window.api?.onGenProgress((m: string) => setSingleProgress(m)); }, []);
 
+  // Fallback: listen for champion done event in case invoke doesn't resolve
+  useEffect(() => {
+    window.api?.onGenChampionDone?.((r: any) => {
+      if (singleStatus !== 'running') return;
+      setSingleStatus('done');
+      setSingleProgress('');
+      if (r.generated > 0) {
+        setSingleMsg(`✅ ${r.generated} skins generated${r.errors?.length ? ` (${r.errors.length} errors)` : ''}`);
+        notify(`${r.generated} skins generated!`, true);
+      } else {
+        setSingleMsg(`❌ Failed — ${r.errors?.[0] || 'Unknown error'}`);
+      }
+      onDone();
+    });
+  }, [singleStatus]);
+
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {

@@ -107,6 +107,8 @@ export class InjectorService {
     if (!this.isReady()) return { success: false, message: 'cslol-tools not ready. Go to Settings → Setup.' };
 
     const modTools = path.join(this.toolsDir, 'mod-tools.exe');
+    // Use the parent directory of cslol-tools as the working dir (like standalone CSLoL Manager)
+    const cslolRoot = path.dirname(this.toolsDir);
 
     let mods: string[];
     if (modNames) {
@@ -119,16 +121,17 @@ export class InjectorService {
 
     if (mods.length === 0) return { success: false, message: 'No mods to apply' };
 
-    // Clean overlay
-    if (fs.existsSync(this.overlayDir)) fs.rmSync(this.overlayDir, { recursive: true, force: true });
-    fs.mkdirSync(this.overlayDir, { recursive: true });
+    // Use a profile-style overlay dir (like standalone CSLoL Manager does)
+    const profileDir = path.join(cslolRoot, 'profiles', 'RiftChanger');
+    if (fs.existsSync(profileDir)) fs.rmSync(profileDir, { recursive: true, force: true });
+    fs.mkdirSync(profileDir, { recursive: true });
 
     // mkoverlay — use execFile with proper args array (handles spaces correctly)
     const modsArg = mods.join('/');
     const mkArgs = [
       'mkoverlay',
       this.modsDir,
-      this.overlayDir,
+      profileDir,
       `--game:${this.gamePath}`,
       `--mods:${modsArg}`,
       '--ignoreConflict',
@@ -149,13 +152,8 @@ export class InjectorService {
       return { success: false, message: `mkoverlay failed: ${e.message.slice(0, 500)}` };
     }
 
-    // Config file — write initial config for runoverlay
-    fs.writeFileSync(this.configFile, JSON.stringify({
-      game: this.gamePath,
-      overlay: this.overlayDir,
-      blacklist: true,
-      opts: [],
-    }));
+    // Config file in the cslol root (like standalone)
+    const cfgFile = path.join(cslolRoot, 'riftchanger-config.json');
 
     // runoverlay — keep stdio so we can monitor and the process stays alive
     try {
@@ -164,8 +162,8 @@ export class InjectorService {
 
       this.overlayProcess = spawn(
         modTools,
-        ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`],
-        { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], cwd: this.toolsDir }
+        ['runoverlay', profileDir, cfgFile, `--game:${this.gamePath}`],
+        { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], cwd: cslolRoot }
       );
 
       this.overlayProcess.stdout?.on('data', (d: Buffer) => {

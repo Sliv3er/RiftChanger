@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   generateAll: () => ipcRenderer.invoke('gen:all'),
   onGenProgress: (cb: (m: string) => void) => ipcRenderer.on('gen:progress', (_e, m) => cb(m)),
   onGenAllProgress: (cb: (p: any) => void) => ipcRenderer.on('gen:allProgress', (_e, p) => cb(p)),
+  onGenChampionDone: (cb: (r: any) => void) => ipcRenderer.on('gen:championDone', (_e, r) => cb(r)),
 
   selectFolder: () => ipcRenderer.invoke('selectFolder'),
 });

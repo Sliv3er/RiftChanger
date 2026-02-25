@@ -37,6 +37,7 @@ declare global {
       generateAll(): Promise<any>;
       onGenProgress(cb: (m: string) => void): void;
       onGenAllProgress(cb: (p: any) => void): void;
+      onGenChampionDone(cb: (r: any) => void): void;
       selectFolder(): Promise<string | null>;
     };
   }
