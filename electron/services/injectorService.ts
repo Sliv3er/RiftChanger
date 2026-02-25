@@ -149,8 +149,13 @@ export class InjectorService {
       return { success: false, message: `mkoverlay failed: ${e.message.slice(0, 500)}` };
     }
 
-    // Config file — must NOT pre-exist; runoverlay creates it as output
-    if (fs.existsSync(this.configFile)) fs.unlinkSync(this.configFile);
+    // Config file — write initial config for runoverlay
+    fs.writeFileSync(this.configFile, JSON.stringify({
+      game: this.gamePath,
+      overlay: this.overlayDir,
+      blacklist: true,
+      opts: [],
+    }));
 
     // runoverlay — keep stdio so we can monitor and the process stays alive
     try {
@@ -159,7 +164,7 @@ export class InjectorService {
 
       this.overlayProcess = spawn(
         modTools,
-        ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`, '--opts:none'],
+        ['runoverlay', this.overlayDir, this.configFile, `--game:${this.gamePath}`],
         { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], cwd: this.toolsDir }
       );
 
