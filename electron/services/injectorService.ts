@@ -16,7 +16,7 @@ import { spawn, execFile, execFileSync, ChildProcess } from 'child_process';
 import axios from 'axios';
 import AdmZip from 'adm-zip';
 
-const CSLOL_RELEASES_API = 'https://api.github.com/repos/LeagueToolkit/cslol-manager/releases/latest';
+// Known working CSLoL Manager .zip release (matches Rift app approach)
 
 let overlayLog = '';
 
@@ -70,7 +70,9 @@ export class InjectorService {
   }
 
   isReady(): boolean {
-    return !!this.cslolExe && fs.existsSync(this.cslolExe);
+    // Must have BOTH cslol-manager.exe AND mod-tools.exe (cslol-tools extracted)
+    return !!this.cslolExe && fs.existsSync(this.cslolExe) 
+      && !!this.modToolsExe && fs.existsSync(this.modToolsExe);
   }
 
   async setup(forceReinstall = false): Promise<{ success: boolean; message: string }> {
@@ -86,14 +88,13 @@ export class InjectorService {
       }
       fs.mkdirSync(dlDir, { recursive: true });
       
-      const rel = await axios.get(CSLOL_RELEASES_API, { headers: { 'User-Agent': 'RiftChanger/1.0' }, timeout: 15000 });
-      // Find Windows asset — could be .zip or .exe (self-extracting)
-      const asset = rel.data.assets.find((a: any) => a.name.toLowerCase().includes('win'))
-                 || rel.data.assets.find((a: any) => a.name.endsWith('.zip') || a.name.endsWith('.exe'));
-      if (!asset) return { success: false, message: 'No CSLoL release found' };
+      // Use known working .zip release (same approach as Rift app)
+      // Recent releases are .exe (7z SFX) which can't be easily extracted
+      const CSLOL_ZIP_URL = 'https://github.com/LeagueToolkit/cslol-manager/releases/download/2025-06-26-a2fb470/cslol-manager.zip';
+      const CSLOL_EXTRACT_FOLDER = 'cslol-manager-2025-06-26-a2fb470';
       
-      const dlPath = path.join(this.basePath, asset.name);
-      const res = await axios.get(asset.browser_download_url, { 
+      const dlPath = path.join(this.basePath, 'cslol-manager.zip');
+      const res = await axios.get(CSLOL_ZIP_URL, { 
         responseType: 'arraybuffer', 
         headers: { 'User-Agent': 'RiftChanger/1.0' }, 
         timeout: 300000, 
@@ -101,38 +102,27 @@ export class InjectorService {
       });
       fs.writeFileSync(dlPath, Buffer.from(res.data));
       
-      if (asset.name.endsWith('.zip')) {
-        const zip = new AdmZip(dlPath);
-        zip.extractAllTo(dlDir, true);
-      } else if (asset.name.endsWith('.exe')) {
-        // Self-extracting exe — run it silently to extract
-        // First try running it with /S (NSIS silent) or just copy and run
-        const { execFileSync: efs } = require('child_process');
-        try {
-          // CSLoL Manager exe is a self-extracting 7z or just the app itself
-          // Check if it's an installer or the actual app
-          const exeSize = fs.statSync(dlPath).size;
-          if (exeSize > 20 * 1024 * 1024) {
-            // It's the actual cslol-manager.exe (36MB) — just place it directly
-            fs.mkdirSync(dlDir, { recursive: true });
-            fs.copyFileSync(dlPath, path.join(dlDir, 'cslol-manager.exe'));
-            // We still need cslol-tools — download separately or extract from the exe
-            // Try running the exe to see if it self-extracts cslol-tools on first run
-            // For now, check if there's a cslol-tools release or if the exe contains it
-            // The cslol-manager.exe bundles everything — run it once to extract cslol-tools
-            try {
-              const proc = require('child_process').spawn(path.join(dlDir, 'cslol-manager.exe'), [], {
-                cwd: dlDir, windowsHide: true, stdio: 'ignore', detached: true
-              });
-              // Wait for it to create cslol-tools
-              await new Promise(r => setTimeout(r, 5000));
-              try { proc.kill(); } catch {}
-              try { efs('taskkill', ['/F', '/IM', 'cslol-manager.exe'], { windowsHide: true }); } catch {}
-            } catch {}
-          }
-        } catch {}
+      // Extract to temp dir first
+      const tempDir = path.join(this.basePath, 'temp_extract');
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+      
+      const zip = new AdmZip(dlPath);
+      zip.extractAllTo(tempDir, true);
+      
+      // Move extracted folder to final location
+      const extracted = path.join(tempDir, CSLOL_EXTRACT_FOLDER);
+      if (fs.existsSync(extracted)) {
+        if (fs.existsSync(dlDir)) fs.rmSync(dlDir, { recursive: true, force: true });
+        fs.renameSync(extracted, dlDir);
+      } else {
+        // Fallback: the zip might extract directly
+        if (fs.existsSync(dlDir)) fs.rmSync(dlDir, { recursive: true, force: true });
+        fs.renameSync(tempDir, dlDir);
       }
+      
+      // Cleanup
       try { fs.unlinkSync(dlPath); } catch {}
+      try { if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
       
       if (this.findCslol()) {
         // Write initial config
