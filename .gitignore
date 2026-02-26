@@ -5,3 +5,7 @@ release/
 .vite/
 *.tsbuildinfo
 lol-skins/
+test-bard/
+test-darius-extract/
+test-our-output/
+test-t1bard/
