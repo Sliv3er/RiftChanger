@@ -72,17 +72,18 @@
       "unpackDirName": "RiftChanger"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
       "perMachine": false,
-      "createDesktopShortcut": true,
+      "allowElevation": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "RiftChanger",
-      "runAfterFinish": false,
+      "runAfterFinish": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "artifactName": "RiftChanger-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false,
+      "installerHeaderIcon": "build/icon.ico",
       "include": "build/installer.nsh"
     }
   }
