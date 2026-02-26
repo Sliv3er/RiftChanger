@@ -1,16 +1,55 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { ChampionData, SkinData, SkinFile } from '../types/api';
+import type { ChampionData, SkinFile } from '../types/api';
 
-// DDragon URLs
 const DDRAGON = 'https://ddragon.leagueoflegends.com';
-const champIcon = (patch: string, id: string) => `${DDRAGON}/cdn/${patch}/img/champion/${id}.png`;
-const splashUrl = (id: string, num: number) => `${DDRAGON}/cdn/img/champion/splash/${id}_${num}.jpg`;
-const loadingUrl = (id: string, num: number) => `${DDRAGON}/cdn/img/champion/loading/${id}_${num}.jpg`;
 
-const ROLES = ['ALL', 'Fighter', 'Tank', 'Mage', 'Assassin', 'Marksman', 'Support'] as const;
-const ROLE_LABELS: Record<string, string> = {
-  ALL: 'ALL', Fighter: 'TOP', Tank: 'JNG', Mage: 'MID', Assassin: 'MID', Marksman: 'ADC', Support: 'SUP'
+interface SkinData { id: number; num: number; name: string; chromas: boolean; }
+
+// Role mapping — same as Rift
+const ROLE_MAP: Record<string, string> = {
+  'Aatrox':'TOP','Camille':'TOP','Darius':'TOP','Dr. Mundo':'TOP','Fiora':'TOP','Gangplank':'TOP',
+  'Garen':'TOP','Gnar':'TOP','Gwen':'TOP','Illaoi':'TOP','Irelia':'TOP','Jax':'TOP','Jayce':'TOP',
+  "K'Sante":'TOP','Kayle':'TOP','Kennen':'TOP','Kled':'TOP','Malphite':'TOP','Mordekaiser':'TOP',
+  'Nasus':'TOP','Olaf':'TOP','Ornn':'TOP','Pantheon':'TOP','Poppy':'TOP','Quinn':'TOP',
+  'Renekton':'TOP','Riven':'TOP','Rumble':'TOP','Sett':'TOP','Shen':'TOP','Singed':'TOP',
+  'Sion':'TOP','Tahm Kench':'TOP','Teemo':'TOP','Trundle':'TOP','Tryndamere':'TOP','Urgot':'TOP',
+  'Vladimir':'TOP','Volibear':'TOP','Warwick':'TOP','Wukong':'TOP','Yorick':'TOP',
+  'Amumu':'JUNGLE','Diana':'JUNGLE','Ekko':'JUNGLE','Elise':'JUNGLE','Evelynn':'JUNGLE',
+  'Fiddlesticks':'JUNGLE','Graves':'JUNGLE','Hecarim':'JUNGLE','Ivern':'JUNGLE',
+  'Jarvan IV':'JUNGLE','Karthus':'JUNGLE','Kayn':'JUNGLE',"Kha'Zix":'JUNGLE','Kindred':'JUNGLE',
+  'Lee Sin':'JUNGLE','Lillia':'JUNGLE','Master Yi':'JUNGLE','Nidalee':'JUNGLE','Nocturne':'JUNGLE',
+  'Nunu & Willump':'JUNGLE','Rammus':'JUNGLE',"Rek'Sai":'JUNGLE','Rengar':'JUNGLE',
+  'Sejuani':'JUNGLE','Shaco':'JUNGLE','Shyvana':'JUNGLE','Skarner':'JUNGLE','Udyr':'JUNGLE',
+  'Vi':'JUNGLE','Viego':'JUNGLE','Xin Zhao':'JUNGLE','Zac':'JUNGLE',
+  'Ahri':'MID','Akali':'MID','Akshan':'MID','Anivia':'MID','Annie':'MID','Aurelion Sol':'MID',
+  'Azir':'MID','Cassiopeia':'MID','Corki':'MID','Fizz':'MID','Galio':'MID','Heimerdinger':'MID',
+  'Kassadin':'MID','Katarina':'MID','LeBlanc':'MID','Lissandra':'MID','Lux':'MID','Malzahar':'MID',
+  'Neeko':'MID','Orianna':'MID','Qiyana':'MID','Ryze':'MID','Sylas':'MID','Syndra':'MID',
+  'Talon':'MID','Twisted Fate':'MID','Veigar':'MID',"Vel'Koz":'MID','Viktor':'MID',
+  'Xerath':'MID','Yasuo':'MID','Yone':'MID','Zed':'MID','Ziggs':'MID','Zoe':'MID',
+  'Aphelios':'ADC','Ashe':'ADC','Caitlyn':'ADC','Draven':'ADC','Ezreal':'ADC','Jhin':'ADC',
+  'Jinx':'ADC',"Kai'Sa":'ADC','Kalista':'ADC',"Kog'Maw":'ADC','Lucian':'ADC',
+  'Miss Fortune':'ADC','Nilah':'ADC','Samira':'ADC','Sivir':'ADC','Tristana':'ADC',
+  'Twitch':'ADC','Varus':'ADC','Vayne':'ADC','Xayah':'ADC','Zeri':'ADC',
+  'Alistar':'SUPPORT','Bard':'SUPPORT','Blitzcrank':'SUPPORT','Braum':'SUPPORT','Janna':'SUPPORT',
+  'Karma':'SUPPORT','Leona':'SUPPORT','Lulu':'SUPPORT','Morgana':'SUPPORT','Nami':'SUPPORT',
+  'Nautilus':'SUPPORT','Pyke':'SUPPORT','Rakan':'SUPPORT','Rell':'SUPPORT',
+  'Senna':'SUPPORT','Seraphine':'SUPPORT','Sona':'SUPPORT','Soraka':'SUPPORT',
+  'Thresh':'SUPPORT','Yuumi':'SUPPORT','Zilean':'SUPPORT','Zyra':'SUPPORT',
 };
+
+const getRole = (name: string, tags: string[]) => {
+  if (ROLE_MAP[name]) return ROLE_MAP[name];
+  if (tags?.includes('Marksman')) return 'ADC';
+  if (tags?.includes('Support')) return 'SUPPORT';
+  if (tags?.includes('Assassin')) return 'MID';
+  if (tags?.includes('Mage')) return 'MID';
+  if (tags?.includes('Tank')) return 'TOP';
+  if (tags?.includes('Fighter')) return 'TOP';
+  return 'MID';
+};
+
+const ROLES = ['ALL', 'TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'] as const;
 
 interface Props {
   champions: ChampionData[];
@@ -25,260 +64,324 @@ interface Props {
 export default function Skins({ champions, patch, skinsPath, appliedMods, onApply, onRemove, notify }: Props) {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
-  const [selectedChamp, setSelectedChamp] = useState<ChampionData | null>(null);
+  const [selectedChamp, setSelectedChamp] = useState<any>(null);
   const [skins, setSkins] = useState<SkinData[]>([]);
   const [skinFiles, setSkinFiles] = useState<SkinFile[]>([]);
-  const [selectedSkinIdx, setSelectedSkinIdx] = useState(0);
+  const [selectedSkin, setSelectedSkin] = useState<SkinData | null>(null);
   const [chromaFiles, setChromaFiles] = useState<SkinFile[]>([]);
-  const [showChromas, setShowChromas] = useState(false);
+  const [expandedChroma, setExpandedChroma] = useState<number | null>(null);
   const [applying, setApplying] = useState(false);
-  const stripRef = useRef<HTMLDivElement>(null);
+  const [skinPageIndex, setSkinPageIndex] = useState(0);
+  const chromaRef = useRef<HTMLDivElement>(null);
 
-  // Filter champions
   const filtered = useMemo(() => {
-    let list = champions;
-    if (roleFilter !== 'ALL') list = list.filter(c => c.tags?.includes(roleFilter));
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(c => c.name.toLowerCase().includes(q));
-    }
+    let list = [...champions];
+    if (roleFilter !== 'ALL') list = list.filter(c => getRole(c.name, c.tags) === roleFilter);
+    if (search) { const q = search.toLowerCase(); list = list.filter(c => c.name.toLowerCase().includes(q)); }
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }, [champions, roleFilter, search]);
 
-  // Load skins + skin files when champion selected
-  useEffect(() => {
-    if (!selectedChamp) return;
-    (async () => {
-      const [skinsData, filesData] = await Promise.all([
-        window.api.getChampionSkins(selectedChamp.id),
-        window.api.findSkinFiles(skinsPath, selectedChamp.name),
-      ]);
-      setSkins(skinsData || []);
-      setSkinFiles(filesData?.skinFiles || []);
-      setSelectedSkinIdx(0);
-      setShowChromas(false);
-      setChromaFiles([]);
-    })();
-  }, [selectedChamp, skinsPath]);
-
-  // Load chromas when skin selected
-  useEffect(() => {
-    if (!selectedChamp || !skinFiles[selectedSkinIdx]) return;
-    (async () => {
-      const res = await window.api.findChromaFiles(skinsPath, selectedChamp.name, skinFiles[selectedSkinIdx].name);
-      setChromaFiles(res?.chromaFiles || []);
-    })();
-  }, [selectedChamp, selectedSkinIdx, skinFiles, skinsPath]);
-
-  const currentSkinFile = skinFiles[selectedSkinIdx];
-  const currentSkin = skins.find(s => {
-    if (!currentSkinFile) return false;
-    const skinName = currentSkinFile.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const sName = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return sName.includes(skinName) || skinName.includes(sName);
-  });
-  const skinNum = currentSkin?.num || 0;
-  const isApplied = selectedChamp ? appliedMods[selectedChamp.name]?.skinName === currentSkinFile?.name : false;
-
-  const handleApply = useCallback(async (zipPath?: string) => {
-    if (!selectedChamp || !currentSkinFile) return;
-    setApplying(true);
+  // Load champion detail when selected
+  const selectChampion = useCallback(async (champ: ChampionData) => {
     try {
-      await onApply(selectedChamp.name, currentSkinFile.name, zipPath || currentSkinFile.path);
-    } finally {
-      setApplying(false);
-    }
-  }, [selectedChamp, currentSkinFile, onApply]);
+      const detail = await fetch(`${DDRAGON}/cdn/${patch}/data/en_US/champion/${champ.id}.json`)
+        .then(r => r.json()).then(d => d.data[champ.id]);
+      setSelectedChamp(detail);
+      setSelectedSkin(detail.skins[0]);
+      setSkinPageIndex(0);
+      setExpandedChroma(null);
+      // Load skin files
+      const files = await window.api.findSkinFiles(skinsPath, champ.name);
+      setSkinFiles(files?.skinFiles || []);
+    } catch { setSelectedChamp(null); }
+  }, [patch, skinsPath]);
 
-  const handleRemove = useCallback(async () => {
-    if (!selectedChamp) return;
-    await onRemove(selectedChamp.name);
-  }, [selectedChamp, onRemove]);
+  // Load chromas when skin changes
+  useEffect(() => {
+    if (!selectedChamp || !selectedSkin) return;
+    const skinName = selectedSkin.name === 'default' ? 'Classic' : selectedSkin.name;
+    window.api.findChromaFiles(skinsPath, selectedChamp.name, skinName)
+      .then(r => setChromaFiles(r?.chromaFiles || []))
+      .catch(() => setChromaFiles([]));
+  }, [selectedChamp, selectedSkin, skinsPath]);
 
-  const scrollStrip = (dir: number) => {
-    if (stripRef.current) stripRef.current.scrollBy({ left: dir * 300, behavior: 'smooth' });
+  // Close chroma on click outside / escape
+  useEffect(() => {
+    if (expandedChroma === null) return;
+    const handleClick = (e: MouseEvent) => {
+      if (chromaRef.current && !chromaRef.current.contains(e.target as Node)) setExpandedChroma(null);
+    };
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpandedChroma(null); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
+  }, [expandedChroma]);
+
+  const normalizeName = (s: string) => s?.toLowerCase().replace(/['"\\\/]/g, '').replace(/\s+/g, ' ').trim() || '';
+
+  const findSkinFileForSkin = (skinName: string): SkinFile | null => {
+    const norm = normalizeName(skinName);
+    return skinFiles.find(f => normalizeName(f.name) === norm)
+      || skinFiles.find(f => normalizeName(f.name).includes(norm) || norm.includes(normalizeName(f.name)))
+      || null;
   };
 
-  // ─── Champion Grid View ───
+  const handleApply = useCallback(async (zipPath: string, skinName: string) => {
+    if (!selectedChamp) return;
+    setApplying(true);
+    try { await onApply(selectedChamp.name, skinName, zipPath); }
+    finally { setApplying(false); }
+  }, [selectedChamp, onApply]);
+
+  // ─── CHAMPION GRID (matches Rift exactly) ───
   if (!selectedChamp) {
     return (
-      <div className="h-full flex flex-col" style={{ background: '#010A13' }}>
-        {/* Header: Search + Role Filter */}
-        <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: '1px solid #1E2328' }}>
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search champions..."
-            className="league-input flex-1"
-            style={{ maxWidth: 300 }}
-          />
-          <div className="flex gap-1">
-            {ROLES.map(r => (
-              <button key={r} onClick={() => setRoleFilter(r)}
-                className={`px-3 py-1.5 text-xs font-bold tracking-wider rounded transition-all ${
-                  roleFilter === r
-                    ? 'text-[#010A13]'
-                    : 'text-[#A09B8C] hover:text-[#F0E6D2]'
-                }`}
-                style={roleFilter === r ? { background: 'linear-gradient(180deg, #C89B3C 0%, #785A28 100%)' } : { background: '#1E2328' }}>
-                {r === 'ALL' ? 'ALL' : r.toUpperCase().slice(0, 3)}
-              </button>
-            ))}
+      <div className="w-full text-white flex flex-col relative"
+        style={{ height: 'calc(100vh - 32px - 36px)', background: 'linear-gradient(135deg, #0a0e13 0%, #1e2328 50%, #0a0e13 100%)' }}>
+        {/* Background image */}
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: 'url(https://cdna.artstation.com/p/assets/images/images/018/338/344/large/alex-flores-godkingdarius-alexflores.jpg)', opacity: 0.25, filter: 'blur(0.5px)' }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/35 to-black/60" />
+        {/* Gold accent line */}
+        <div className="absolute top-0 left-0 right-0 h-1"
+          style={{ background: 'linear-gradient(90deg, transparent 0%, #c89b3c 20%, #f0e6d2 50%, #c89b3c 80%, transparent 100%)', boxShadow: '0 0 10px rgba(200, 155, 60, 0.4)' }} />
+
+        {/* Header */}
+        <div className="relative z-10 flex-shrink-0 py-4">
+          <div className="text-center mb-4">
+            <h1 className="text-3xl font-bold tracking-wide"
+              style={{ background: 'linear-gradient(135deg, #f0e6d2 0%, #c89b3c 50%, #f0e6d2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '1px' }}>
+              PICK YOUR CHAMPION
+            </h1>
+          </div>
+
+          {/* Controls */}
+          <div className="px-6">
+            <div className="flex items-center justify-between max-w-5xl mx-auto">
+              {/* Role buttons */}
+              <div className="flex items-center space-x-2">
+                {ROLES.map(r => (
+                  <button key={r} onClick={() => setRoleFilter(r)}
+                    className="relative w-10 h-10 flex items-center justify-center transition-transform duration-150 rounded-lg"
+                    style={{
+                      background: roleFilter === r ? '#c89b3c' : 'rgba(30, 35, 40, 0.9)',
+                      border: roleFilter === r ? '1px solid #f0e6d2' : '1px solid rgba(70, 55, 20, 0.6)',
+                      boxShadow: roleFilter === r ? '0 2px 8px rgba(200, 155, 60, 0.4)' : '0 1px 4px rgba(0, 0, 0, 0.2)',
+                      transform: roleFilter === r ? 'scale(1.05)' : undefined,
+                    }}>
+                    <span className="text-xs font-bold" style={{ color: roleFilter === r ? '#0a0e13' : '#f0e6d2' }}>
+                      {r === 'JUNGLE' ? 'JNG' : r === 'SUPPORT' ? 'SUP' : r}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)}
+                  className="px-3 py-2 pr-8 text-xs rounded-lg focus:outline-none transition-shadow w-40"
+                  style={{ background: 'rgba(15, 20, 25, 0.95)', border: '1px solid rgba(200, 155, 60, 0.3)', color: '#f0e6d2' }} />
+                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-yellow-500 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Champion Grid — 8 columns */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(8, 1fr)' }}>
-            {filtered.map(c => {
-              const hasApplied = !!appliedMods[c.name];
-              return (
-                <button key={c.id} onClick={() => setSelectedChamp(c)}
-                  className="relative group text-center transition-transform hover:scale-105"
-                  style={{ aspectRatio: '1' }}>
-                  <div className="w-full h-full rounded overflow-hidden border-2 transition-colors"
-                    style={{ borderColor: hasApplied ? '#C89B3C' : '#1E2328' }}>
-                    <img src={champIcon(patch, c.id)} alt={c.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy" />
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 text-[10px] font-bold truncate px-1 py-0.5"
-                    style={{ background: 'rgba(0,0,0,0.8)', color: '#A09B8C' }}>
-                    {c.name}
-                  </div>
-                  {hasApplied && (
-                    <div className="absolute top-0 right-0 w-3 h-3 rounded-full m-0.5" style={{ background: '#C89B3C' }} />
-                  )}
-                </button>
-              );
-            })}
+        {/* Champion Grid */}
+        <div className="electron-scroll" style={{ position: 'absolute', top: '180px', left: '20px', right: '20px', bottom: '20px', overflowY: 'scroll', padding: '20px', zIndex: 20 }}>
+          <div className="grid grid-cols-8 gap-3 max-w-5xl mx-auto pb-8">
+            {filtered.map(c => (
+              <div key={c.id} className="relative flex flex-col items-center group">
+                <div onClick={() => selectChampion(c)}
+                  className="relative w-16 h-16 cursor-pointer rounded-lg overflow-hidden transform transition-all duration-300 hover:scale-110 hover:-translate-y-1 active:scale-95"
+                  style={{ border: '1px solid rgba(200, 155, 60, 0.4)', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)', background: 'rgba(30, 35, 40, 0.95)' }}>
+                  <img src={`${DDRAGON}/cdn/${patch}/img/champion/${c.id}.png`} alt={c.name}
+                    className="w-full h-full object-cover" loading="lazy"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-all duration-300 pointer-events-none"
+                    style={{ background: 'linear-gradient(135deg, rgba(200, 155, 60, 0.6) 0%, rgba(240, 230, 210, 0.4) 100%)' }} />
+                </div>
+                <p className="text-xs text-center mt-2 font-medium w-full truncate text-gray-200 transition-colors group-hover:text-gold-300">{c.name}</p>
+                {appliedMods[c.name] && (
+                  <div className="absolute top-0 right-0 w-3 h-3 bg-emerald-400 rounded-full shadow-lg" style={{ boxShadow: '0 0 8px rgba(10,207,131,0.6)' }} />
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  // ─── Skin Detail View ───
+  // ─── CHAMPION DETAIL (matches Rift exactly) ───
+  const appliedSkin = appliedMods[selectedChamp.name];
+  const skinName = selectedSkin?.name === 'default' ? 'Classic' : (selectedSkin?.name || 'Classic');
+  const skinNum = selectedSkin?.num || 0;
+  const skinFile = findSkinFileForSkin(skinName);
+  const isApplied = appliedSkin?.skinName === skinName;
+  const hasAnyApplied = !!appliedSkin;
+  const skinsPerPage = 5;
+  const visibleSkins = selectedChamp.skins.slice(skinPageIndex * skinsPerPage, (skinPageIndex + 1) * skinsPerPage);
+  const hasChromas = chromaFiles.length > 0 && skinName !== 'Classic';
+
   return (
-    <div className="h-full flex flex-col relative" style={{ background: '#010A13' }}>
-      {/* Splash Background */}
-      <div className="absolute inset-0 z-0">
-        <img src={splashUrl(selectedChamp.id, skinNum)}
-          className="w-full h-full object-cover opacity-30"
-          onError={(e) => { (e.target as HTMLImageElement).src = splashUrl(selectedChamp.id, 0); }} />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, #010A13 0%, transparent 60%)' }} />
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, #010A13 0%, transparent 30%)' }} />
+    <div className="absolute inset-0 bg-black text-white">
+      {/* Full splash background */}
+      <div className="absolute inset-0">
+        <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skinNum}.jpg`} alt="" className="w-full h-full object-cover"
+          onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80" />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="flex items-center gap-3 px-6 py-3">
-          <button onClick={() => setSelectedChamp(null)}
-            className="text-[#C89B3C] hover:text-[#F0E6D2] text-sm font-bold flex items-center gap-1">
-            ← BACK
-          </button>
-          <span className="text-[#A09B8C] text-sm">|</span>
-          <span className="text-[#F0E6D2] text-lg font-bold tracking-wide">{selectedChamp.name.toUpperCase()}</span>
-          {appliedMods[selectedChamp.name] && (
-            <span className="text-[#C89B3C] text-xs ml-2 px-2 py-0.5 rounded" style={{ background: 'rgba(200,155,60,0.15)' }}>
-              {appliedMods[selectedChamp.name].skinName} ACTIVE
-            </span>
-          )}
-        </div>
+      {/* Back button */}
+      <div className="absolute top-6 left-6 z-20">
+        <button onClick={() => setSelectedChamp(null)}
+          className="flex items-center space-x-2 px-4 py-2 bg-black/50 hover:bg-black/70 text-white rounded border border-yellow-600/50 hover:border-yellow-500 transition-all">
+          <span className="text-xl">‹</span><span>Back</span>
+        </button>
+      </div>
 
-        {/* Center: Skin portrait + info */}
-        <div className="flex-1 flex items-center justify-center gap-10 px-10">
-          {/* Circular portrait */}
-          <div className="flex-shrink-0">
-            <div className="w-64 h-64 rounded-full overflow-hidden border-4"
-              style={{ borderColor: isApplied ? '#C89B3C' : '#1E2328' }}>
-              <img src={loadingUrl(selectedChamp.id, skinNum)}
-                className="w-full h-full object-cover object-top"
-                onError={(e) => { (e.target as HTMLImageElement).src = loadingUrl(selectedChamp.id, 0); }} />
-            </div>
-          </div>
-
-          {/* Skin info + actions */}
-          <div className="flex flex-col gap-4">
-            <h2 className="text-2xl font-bold" style={{ color: '#F0E6D2' }}>
-              {currentSkinFile?.name || 'Default'}
-            </h2>
-
-            {/* Chromas */}
-            {chromaFiles.length > 0 && (
-              <div className="relative">
-                <button onClick={() => setShowChromas(!showChromas)}
-                  className="px-4 py-2 text-sm font-bold rounded transition-all"
-                  style={{ background: '#1E2328', color: '#C89B3C', border: '1px solid #785A28' }}>
-                  🎨 CHROMAS ({chromaFiles.length})
-                </button>
-                {showChromas && (
-                  <div className="absolute bottom-full mb-2 left-0 p-3 rounded-lg grid grid-cols-4 gap-2 max-w-sm"
-                    style={{ background: '#0A0E13', border: '1px solid #1E2328' }}>
-                    {chromaFiles.map((cf, i) => (
-                      <button key={i} onClick={() => { handleApply(cf.path); setShowChromas(false); }}
-                        className="px-2 py-1.5 text-xs rounded hover:scale-105 transition-all truncate"
-                        style={{ background: '#1E2328', color: '#A09B8C', border: '1px solid #32281E' }}
-                        title={cf.name}>
-                        {cf.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+      {/* Center champion display */}
+      <div className="relative z-10 h-full flex items-center justify-center pb-40">
+        <div className="text-center">
+          {/* Large circular portrait with golden ring */}
+          <div className="relative w-96 h-96 mx-auto mb-2">
+            <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #fbbf24, #f59e0b, #fbbf24, #f59e0b, #fbbf24)', padding: '4px' }}>
+              <div className="w-full h-full rounded-full overflow-hidden bg-black">
+                <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skinNum}.jpg`} alt={skinName} className="w-full h-full object-cover"
+                  onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
               </div>
-            )}
-
-            {/* Apply / Remove buttons */}
-            <div className="flex gap-3">
-              {!isApplied ? (
-                <button onClick={() => handleApply()} disabled={applying || !currentSkinFile}
-                  className="px-8 py-3 font-bold text-sm tracking-wider rounded transition-all disabled:opacity-50"
-                  style={{ background: 'linear-gradient(180deg, #C89B3C 0%, #785A28 100%)', color: '#010A13' }}>
-                  {applying ? 'APPLYING...' : 'LOCK IN'}
-                </button>
-              ) : (
-                <button onClick={handleRemove}
-                  className="px-8 py-3 font-bold text-sm tracking-wider rounded transition-all"
-                  style={{ background: '#3C2A2A', color: '#E84057', border: '1px solid #E84057' }}>
-                  REMOVE
-                </button>
-              )}
             </div>
+            <div className="absolute inset-2 rounded-full border border-gold-400/40" />
+            {/* Tick marks */}
+            <div className="absolute inset-0">
+              {[...Array(72)].map((_, i) => (
+                <div key={i} className={`absolute ${i % 6 === 0 ? 'w-1 h-6 bg-gold-400' : 'w-0.5 h-3 bg-gold-400/60'}`}
+                  style={{ top: '-12px', left: '50%', transformOrigin: '50% 204px', transform: `translateX(-50%) rotate(${i * 5}deg)` }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Skin name */}
+          <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">{skinName}</h1>
+
+          {/* Progress dots */}
+          <div className="flex justify-center space-x-2 mb-1">
+            {selectedChamp.skins.map((skin: SkinData) => (
+              <div key={skin.id} onClick={() => { setSelectedSkin(skin); setExpandedChroma(null); }}
+                className={`w-3 h-3 rounded-full transition-all cursor-pointer hover:scale-110 ${selectedSkin?.id === skin.id ? 'bg-gold-400 scale-125' : 'bg-gray-500 hover:bg-gray-400'}`} />
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Bottom: Skin strip */}
-        <div className="px-6 pb-4" style={{ borderTop: '1px solid #1E2328' }}>
-          <div className="flex items-center gap-2 py-3">
-            <button onClick={() => scrollStrip(-1)} className="text-[#C89B3C] hover:text-[#F0E6D2] text-xl flex-shrink-0">‹</button>
-            <div ref={stripRef} className="flex-1 flex gap-2 overflow-x-auto custom-scrollbar" style={{ scrollbarWidth: 'none' }}>
-              {skinFiles.map((sf, i) => {
-                const skin = skins.find(s => {
-                  const a = sf.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                  const b = s.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                  return b.includes(a) || a.includes(b);
-                });
-                const num = skin?.num || 0;
-                return (
-                  <button key={i} onClick={() => { setSelectedSkinIdx(i); setShowChromas(false); }}
-                    className="flex-shrink-0 w-24 rounded overflow-hidden transition-all"
-                    style={{
-                      border: i === selectedSkinIdx ? '2px solid #C89B3C' : '2px solid transparent',
-                      opacity: i === selectedSkinIdx ? 1 : 0.6,
-                    }}>
-                    <img src={loadingUrl(selectedChamp.id, num)} className="w-full h-32 object-cover object-top"
-                      onError={(e) => { (e.target as HTMLImageElement).src = loadingUrl(selectedChamp.id, 0); }}
-                      loading="lazy" />
-                    <div className="text-[9px] truncate px-1 py-0.5 text-center"
-                      style={{ background: '#0A0E13', color: '#A09B8C' }}>
-                      {sf.name}
-                    </div>
-                  </button>
-                );
-              })}
+      {/* Apply / Remove button */}
+      <div className="absolute z-20" style={{ left: '50%', transform: 'translateX(-50%)', bottom: '80px' }}>
+        {!hasAnyApplied && skinName !== 'Classic' && skinFile && (
+          applying ? (
+            <div className="w-40 h-40 flex items-center justify-center">
+              <div className="w-8 h-8 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
             </div>
-            <button onClick={() => scrollStrip(1)} className="text-[#C89B3C] hover:text-[#F0E6D2] text-xl flex-shrink-0">›</button>
+          ) : (
+            <button onClick={() => handleApply(skinFile.path, skinName)}
+              className="w-40 h-16 rounded-lg font-bold text-lg tracking-wider transition-all hover:scale-110 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #C89B3C 0%, #b8862b 50%, #9a6d1f 100%)', color: '#010A13', boxShadow: '0 4px 20px rgba(200,155,60,0.5)' }}>
+              LOCK IN
+            </button>
+          )
+        )}
+        {isApplied && (
+          <button onClick={() => onRemove(selectedChamp.name)}
+            className="w-40 h-16 rounded-lg font-bold text-lg tracking-wider transition-all hover:scale-110 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', boxShadow: '0 4px 20px rgba(220,38,38,0.5)' }}>
+            REMOVE
+          </button>
+        )}
+        {!hasAnyApplied && skinName !== 'Classic' && !skinFile && (
+          <div className="text-gray-400 text-sm">Skin file not found in library</div>
+        )}
+      </div>
+
+      {/* Bottom skin strip */}
+      <div className="absolute bottom-0 left-0 right-0 z-30" style={{ height: '140px' }}>
+        <div className="flex items-center justify-center py-4 px-8 space-x-6 h-full">
+          {/* Left arrow */}
+          <button onClick={() => setSkinPageIndex(Math.max(0, skinPageIndex - 1))}
+            className={`w-10 h-10 flex items-center justify-center rounded-full border-2 transition-all ${skinPageIndex > 0 ? 'border-gold-400 text-gold-400 hover:bg-gold-400/20' : 'border-gray-600 text-gray-600 cursor-not-allowed'}`}
+            disabled={skinPageIndex === 0}>
+            <span className="text-xl">‹</span>
+          </button>
+
+          {/* Skin cards */}
+          <div className="flex space-x-4">
+            {visibleSkins.map((skin: SkinData) => {
+              const isSelected = selectedSkin?.id === skin.id;
+              const sName = skin.name === 'default' ? 'Classic' : skin.name;
+              const isThisApplied = appliedSkin?.skinName === sName;
+              const skinChromas = chromaFiles.length > 0 && sName !== 'Classic' && isSelected;
+
+              return (
+                <div key={skin.id} className="relative">
+                  <div onClick={() => { setSelectedSkin(skin); setExpandedChroma(null); }}
+                    className={`relative w-24 h-28 cursor-pointer transition-all duration-300 ${hasAnyApplied && !isThisApplied ? 'opacity-60' : ''} ${isSelected ? 'transform scale-110' : 'hover:scale-105'}`}>
+                    {isThisApplied && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/20 via-transparent to-transparent rounded z-10">
+                        <div className="absolute top-1 right-1 w-3 h-3 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50" />
+                      </div>
+                    )}
+                    <div className={`absolute inset-0 rounded ${isThisApplied ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 p-1 shadow-lg shadow-emerald-500/30' : isSelected ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 p-1' : 'bg-gray-700 p-1'}`}>
+                      <div className="w-full h-full rounded overflow-hidden">
+                        <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skin.num}.jpg`} alt={sName} className="w-full h-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
+                      </div>
+                    </div>
+
+                    {/* Chroma button */}
+                    {skinChromas && !hasAnyApplied && (
+                      <button onClick={e => { e.stopPropagation(); setExpandedChroma(expandedChroma === skin.id ? null : skin.id); }}
+                        className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
+                        style={{ background: 'linear-gradient(135deg, #C89B3C, #f0e6d2)', color: '#010A13' }}>
+                        🎨
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Chroma selector popup */}
+                  {expandedChroma === skin.id && chromaFiles.length > 0 && (
+                    <div ref={chromaRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50">
+                      <div className="bg-black/80 backdrop-blur-sm border border-gray-500/50 rounded-lg p-3" style={{ minWidth: '240px' }}>
+                        <div className="flex justify-end mb-2">
+                          <button onClick={() => setExpandedChroma(null)} className="w-6 h-6 text-white hover:text-red-400 bg-black/60 rounded-full text-xs">✕</button>
+                        </div>
+                        <div className="flex flex-wrap gap-3 justify-center">
+                          {chromaFiles.map((cf, i) => (
+                            <button key={i} onClick={() => { handleApply(cf.path, `${cf.name} (${sName})`); setExpandedChroma(null); }}
+                              className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-600 hover:border-gold-400 transition-all hover:scale-110"
+                              title={cf.name}>
+                              <div className="w-full h-full flex items-center justify-center text-[10px] text-center p-1"
+                                style={{ background: `hsl(${(i * 40) % 360}, 60%, 30%)`, color: '#f0e6d2' }}>
+                                {cf.name.slice(0, 20)}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Right arrow */}
+          <button onClick={() => setSkinPageIndex(Math.min(Math.ceil(selectedChamp.skins.length / skinsPerPage) - 1, skinPageIndex + 1))}
+            className={`w-10 h-10 flex items-center justify-center rounded-full border-2 transition-all ${(skinPageIndex + 1) * skinsPerPage < selectedChamp.skins.length ? 'border-gold-400 text-gold-400 hover:bg-gold-400/20' : 'border-gray-600 text-gray-600 cursor-not-allowed'}`}
+            disabled={(skinPageIndex + 1) * skinsPerPage >= selectedChamp.skins.length}>
+            <span className="text-xl">›</span>
+          </button>
         </div>
       </div>
     </div>

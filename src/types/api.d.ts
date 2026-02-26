@@ -15,8 +15,13 @@ export interface SkinData {
 }
 
 export interface ScanResult {
-  champions: Record<string, { skins: number; chromas: number }>;
-  total: { skins: number; chromas: number; champions: number };
+  champions: string[];
+  totalSkins: number;
+  totalChromas: number;
+  totalForms: number;
+  totalExalted: number;
+  skins: any[];
+  errors: string[];
 }
 
 export interface SkinFile {

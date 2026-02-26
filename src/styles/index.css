@@ -1,271 +1,121 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --gold: #C8AA6E;
-  --gold-bright: #F0E6D2;
-  --gold-dark: #785A28;
-  --blue-1: #010A13;
-  --blue-2: #0A1428;
-  --blue-3: #1E2328;
-  --grey: #A09B8C;
-  --grey-dark: #5B5A56;
-  --grey-darker: #3C3C41;
-  --teal: #0AC8B9;
+/* Force custom scrollbar globally */
+html { scrollbar-width: thin; scrollbar-color: #c89b3c #1e2328; }
+html::-webkit-scrollbar { width: 14px; }
+html::-webkit-scrollbar-track { background: rgba(30, 35, 40, 0.9); }
+html::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #f0e6d2 0%, #c89b3c 50%, #f0e6d2 100%);
+  border-radius: 7px; border: 2px solid #463714;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-html, body, #root {
-  height: 100%; overflow: hidden;
-  background: var(--blue-1); color: var(--gold-bright);
-  font-family: 'Inter', -apple-system, sans-serif;
-  font-size: 13px;
-  -webkit-font-smoothing: antialiased;
-  user-select: none;
+@layer base {
+  * { @apply box-border; -webkit-user-select: none; user-select: none; }
+  body { @apply bg-black text-white font-sans antialiased; background: linear-gradient(135deg, #000 0%, #0a0a0a 50%, #1a1a1a 100%); }
+  #root { @apply h-screen w-screen; }
+  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
+  img { -webkit-user-drag: none; user-drag: none; }
 }
 
-/* Scrollbar — thin, subtle */
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #463714; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--gold-dark); }
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-xl border border-gold-500/30 rounded-xl shadow-xl;
+    background: linear-gradient(135deg, rgba(26,26,26,0.6) 0%, rgba(10,10,10,0.8) 100%);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(200,155,60,0.1);
+  }
+  .glass-card-hover { @apply glass-card transition-all duration-300 hover:scale-[1.01] hover:shadow-xl; }
+  .glass-card-hover:hover {
+    background: linear-gradient(135deg, rgba(40,40,40,0.7) 0%, rgba(26,26,26,0.9) 100%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.8), 0 0 30px rgba(200,155,60,0.2), inset 0 1px 0 rgba(200,155,60,0.15);
+  }
+  .btn-primary {
+    @apply relative overflow-hidden text-black font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg text-sm;
+    background: linear-gradient(135deg, #C89B3C 0%, #b8862b 50%, #9a6d1f 100%);
+    box-shadow: 0 4px 15px rgba(200,155,60,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #f0d958 0%, #C89B3C 50%, #b8862b 100%);
+    box-shadow: 0 6px 20px rgba(200,155,60,0.6);
+  }
+  .btn-secondary {
+    @apply backdrop-blur-xl text-gold-400 font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 border text-sm;
+    background: linear-gradient(135deg, rgba(26,26,26,0.6) 0%, rgba(10,10,10,0.8) 100%);
+    border-color: rgba(200,155,60,0.3);
+  }
+  .btn-danger {
+    @apply relative overflow-hidden text-white font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg text-sm;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%);
+  }
+  .input-field {
+    @apply backdrop-blur-xl border rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none transition-all duration-300 text-sm;
+    background: linear-gradient(135deg, rgba(26,26,26,0.6) 0%, rgba(10,10,10,0.8) 100%);
+    border-color: rgba(200,155,60,0.3);
+  }
+  .input-field:focus {
+    border-color: rgba(200,155,60,0.6);
+    box-shadow: 0 0 0 2px rgba(200,155,60,0.1);
+  }
 
-/* Titlebar */
-.drag-region { -webkit-app-region: drag; }
-.no-drag { -webkit-app-region: no-drag; }
+  /* League nav */
+  .lol-nav {
+    display: flex; align-items: center; gap: 0; padding: 0 24px;
+    background: linear-gradient(180deg, #1e2328 0%, #0a0e13 100%);
+    border-bottom: 1px solid #463714; height: 36px;
+  }
+  .lol-nav-tab {
+    padding: 6px 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.15em;
+    color: #A09B8C; background: none; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .lol-nav-tab:hover { color: #F0E6D2; }
+  .lol-nav-tab.active { color: #C89B3C; border-bottom-color: #C89B3C; }
 
-::selection { background: rgba(200,170,110,0.25); }
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 10px 28px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    z-index: 9999; animation: slideUp 0.3s ease-out;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .toast-ok { background: linear-gradient(135deg, #0ACF83 0%, #059669 100%); color: #010A13; }
+  .toast-err { background: linear-gradient(135deg, #E84057 0%, #dc2626 100%); color: #fff; }
 
-/* ═══════════════════════════════════════════
-   LEAGUE CLIENT CHAMPION SELECT STYLES
-   ═══════════════════════════════════════════ */
-
-/* Navigation tabs — League top bar style */
-.lol-nav {
-  display: flex;
-  align-items: center;
-  height: 36px;
-  background: linear-gradient(180deg, #1E2328 0%, #010A13 100%);
-  border-bottom: 1px solid #463714;
-  padding: 0 12px;
-}
-.lol-nav-tab {
-  padding: 0 20px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--grey);
-  cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
-  border-bottom: 2px solid transparent;
-  position: relative;
-}
-.lol-nav-tab:hover { color: var(--gold-bright); }
-.lol-nav-tab.active {
-  color: var(--gold);
-  border-bottom-color: var(--gold);
-}
-
-/* Search input — League style */
-.lol-search {
-  background: rgba(30, 35, 40, 0.8);
-  border: 1px solid var(--grey-darker);
-  color: var(--gold-bright);
-  font-size: 12px;
-  padding: 6px 12px 6px 32px;
-  outline: none;
-  transition: border-color 0.2s;
-  width: 220px;
-}
-.lol-search::placeholder { color: var(--grey-dark); }
-.lol-search:focus { border-color: var(--gold-dark); }
-
-/* Champion grid tile */
-.champ-tile {
-  position: relative;
-  cursor: pointer;
-  overflow: hidden;
-  border: 1px solid transparent;
-  transition: all 0.15s ease;
-  background: var(--blue-3);
-}
-.champ-tile img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.2s ease;
-}
-.champ-tile:hover {
-  border-color: var(--gold);
-  z-index: 1;
-}
-.champ-tile:hover img { transform: scale(1.08); }
-.champ-tile.selected {
-  border-color: var(--gold);
-  box-shadow: 0 0 8px rgba(200,170,110,0.4), inset 0 0 12px rgba(200,170,110,0.1);
-}
-.champ-tile .champ-name {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 2px 0;
-  font-size: 9px;
-  text-align: center;
-  color: var(--grey);
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.champ-tile.dimmed { opacity: 0.3; filter: grayscale(0.6); }
-.champ-tile.dimmed:hover { opacity: 0.8; filter: none; }
-
-/* Skin carousel thumbnail — bottom strip */
-.skin-card {
-  flex-shrink: 0;
-  cursor: pointer;
-  overflow: hidden;
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  position: relative;
-  background: #0A0E13;
-}
-.skin-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.skin-card:hover { border-color: rgba(200,170,110,0.5); }
-.skin-card.active {
-  border-color: var(--gold);
-  box-shadow: 0 0 12px rgba(200,170,110,0.35);
-}
-.skin-card .skin-label {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 3px 4px;
-  font-size: 8px;
-  color: var(--grey);
-  background: linear-gradient(transparent, rgba(0,0,0,0.9));
-  text-align: center;
-  line-height: 1.1;
-}
-.skin-card.active .skin-label { color: var(--gold); }
-.skin-card .avail-dot {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+  /* Titlebar */
+  .titlebar { -webkit-app-region: drag; height: 32px; display: flex; align-items: center; background: #010A13; }
+  .titlebar button { -webkit-app-region: no-drag; }
 }
 
-/* LOCK IN button — hex shape like League */
-.btn-lockin {
-  position: relative;
-  padding: 10px 48px;
-  font-weight: 600;
-  font-size: 12px;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--blue-1);
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s;
-  background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
-  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%);
-}
-.btn-lockin:hover {
-  background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%);
-  filter: brightness(1.15);
-  transform: scale(1.03);
-}
-.btn-lockin:active { transform: scale(0.97); }
-.btn-lockin:disabled { opacity: 0.35; cursor: not-allowed; transform: none; filter: none; }
-
-/* Chroma circles */
-.chroma-circle {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.chroma-circle:hover { border-color: rgba(255,255,255,0.5); transform: scale(1.15); }
-.chroma-circle.active { border-color: var(--gold); box-shadow: 0 0 6px rgba(200,170,110,0.5); }
-
-/* Gold button (settings, etc) */
-.btn-gold {
-  padding: 7px 18px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--blue-1);
-  cursor: pointer;
-  border: none;
-  background: linear-gradient(180deg, #C89B3C 0%, #785A28 100%);
-  transition: all 0.2s;
-}
-.btn-gold:hover { background: linear-gradient(180deg, #F0B232 0%, #C89B3C 100%); }
-.btn-gold:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.btn-outline {
-  padding: 6px 16px;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--gold);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--gold-dark);
-  transition: all 0.2s;
-}
-.btn-outline:hover { border-color: var(--gold); background: rgba(200,170,110,0.08); }
-
-/* Progress */
-.lol-progress {
-  height: 4px;
-  background: var(--grey-darker);
-  overflow: hidden;
-  position: relative;
-}
-.lol-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--gold-dark), var(--gold), var(--gold-dark));
-  transition: width 0.4s ease;
+@layer utilities {
+  .electron-scroll::-webkit-scrollbar { width: 12px; background: transparent; }
+  .electron-scroll::-webkit-scrollbar-track {
+    background: rgba(30, 35, 40, 0.9); border-radius: 9px;
+    border: 2px solid #463714; margin: 4px;
+  }
+  .electron-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f0e6d2 0%, #c89b3c 30%, #d4a574 70%, #f0e6d2 100%);
+    border-radius: 9px; border: 2px solid #463714;
+    box-shadow: 0 2px 6px rgba(200, 155, 60, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    min-height: 40px;
+  }
+  .electron-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #f5ebdc 0%, #d4a574 30%, #b8914a 70%, #f5ebdc 100%);
+  }
+  .custom-scrollbar { scrollbar-width: auto; scrollbar-color: #c89b3c #1e2328; }
+  .custom-scrollbar::-webkit-scrollbar { width: 18px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: #1e2328; border-radius: 10px; border: 1px solid #463714; }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f0e6d2 0%, #c89b3c 50%, #f0e6d2 100%);
+    border-radius: 10px; border: 2px solid #463714;
+    box-shadow: 0 2px 4px rgba(200, 155, 60, 0.4); min-height: 50px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #f5ebdc 0%, #d4a574 50%, #f5ebdc 100%);
+  }
 }
 
-/* Animations */
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.anim-fade { animation: fadeIn 0.25s ease; }
-.anim-slide { animation: slideUp 0.3s ease; }
-
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 200;
-  padding: 10px 24px;
-  font-size: 12px;
-  animation: slideUp 0.3s ease;
-  border: 1px solid;
-}
-.toast-ok { background: #0A2E1E; border-color: rgba(10,200,131,0.4); color: #0ACE83; }
-.toast-err { background: #2E1A1A; border-color: rgba(194,75,75,0.4); color: #C24B4B; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.5); } 50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); } }

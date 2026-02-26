@@ -39,10 +39,10 @@ export default function App() {
     (async () => {
       if (!window.api) return;
       const [p, c, s, sp] = await Promise.all([
-        window.api.getPatch(),
-        window.api.getChampions(),
-        window.api.scan(),
-        window.api.getSkinsPath(),
+        window.api.getPatch().catch(() => '14.24.1'),
+        window.api.getChampions().catch(() => []),
+        window.api.scan().catch(() => null),
+        window.api.getSkinsPath().catch(() => ''),
       ]);
       setPatch(p || '14.24.1');
       setChampions(c || []);
@@ -94,7 +94,7 @@ export default function App() {
         <div className="flex-1" />
         {scanResult && (
           <span style={{ fontSize: 9, color: '#5B5A56', letterSpacing: '0.15em' }}>
-            {scanResult.total.champions} CHAMPS · {scanResult.total.skins} SKINS · PATCH {patch}
+            {scanResult.champions?.length || 0} CHAMPS · {scanResult.totalSkins || 0} SKINS · PATCH {patch}
           </span>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 import { AssetService } from './services/assetService';
 import { GameDetector } from './services/gameDetector';
 import { BackupService } from './services/backupService';
@@ -210,11 +211,17 @@ function registerIPC() {
   });
 }
 
-app.whenReady().then(() => { initServices(); registerIPC(); createWindow(); });
+app.whenReady().then(() => {
+  console.log('[main] app ready');
+  try { initServices(); console.log('[main] services initialized'); } catch (e) { console.error('[main] initServices failed:', e); }
+  try { registerIPC(); console.log('[main] IPC registered'); } catch (e) { console.error('[main] registerIPC failed:', e); }
+  createWindow();
+  console.log('[main] window created');
+});
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (!mainWindow) createWindow(); });
 app.on('before-quit', () => { try { injector?.cleanup(); } catch {} });
 app.on('will-quit', () => {
   try { injector?.cleanup(); } catch {}
-  try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
+  try { execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
 });

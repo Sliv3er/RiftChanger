@@ -5,7 +5,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn, execFile, ChildProcess } from 'child_process';
+import { spawn, execFile, execFileSync, execSync, ChildProcess } from 'child_process';
 import axios from 'axios';
 
 interface AppliedMod {
@@ -129,7 +129,7 @@ export class InjectorService {
       // Extract 7z SFX
       if (fs.existsSync(SEVEN_ZIP)) {
         try {
-          require('child_process').execFileSync(SEVEN_ZIP, ['x', dlPath, `-o${destDir}`, '-y'], { timeout: 120000, windowsHide: true });
+          execFileSync(SEVEN_ZIP, ['x', dlPath, `-o${destDir}`, '-y'], { timeout: 120000, windowsHide: true });
         } catch {}
       }
 
@@ -283,7 +283,7 @@ export class InjectorService {
       try { this.overlayProcess.kill(); } catch {}
       this.overlayProcess = null;
     }
-    try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
+    try { execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
   }
 
   cleanup() {
