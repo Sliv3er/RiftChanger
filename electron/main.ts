@@ -102,6 +102,7 @@ function registerIPC() {
   // Injector
   ipcMain.handle('injector:isReady', () => injector.isReady());
   ipcMain.handle('injector:setup', () => injector.setup());
+  ipcMain.handle('injector:setupFromPath', (_e, p: string) => injector.setupFromPath(p));
   ipcMain.handle('injector:import', (_e, zipPath: string, modName: string) => injector.importMod(zipPath, modName));
   ipcMain.handle('injector:apply', (_e, modNames?: string[]) => injector.apply(modNames));
   ipcMain.handle('injector:stop', () => { injector.stopOverlay(); return { success: true }; });

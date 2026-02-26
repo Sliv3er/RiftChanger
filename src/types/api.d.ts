@@ -26,6 +26,7 @@ declare global {
       detectGame(): Promise<any>;
       injectorReady(): Promise<boolean>;
       injectorSetup(): Promise<{ success: boolean; message: string }>;
+      injectorSetupFromPath(p: string): Promise<{ success: boolean; message: string }>;
       importMod(zip: string, name: string): Promise<{ success: boolean; message: string }>;
       applyMods(names?: string[]): Promise<{ success: boolean; message: string }>;
       stopOverlay(): Promise<any>;

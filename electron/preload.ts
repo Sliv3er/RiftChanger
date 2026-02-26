@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
 
   injectorReady: () => ipcRenderer.invoke('injector:isReady'),
   injectorSetup: () => ipcRenderer.invoke('injector:setup'),
+  injectorSetupFromPath: (p: string) => ipcRenderer.invoke('injector:setupFromPath', p),
   importMod: (zip: string, name: string) => ipcRenderer.invoke('injector:import', zip, name),
   applyMods: (names?: string[]) => ipcRenderer.invoke('injector:apply', names),
   stopOverlay: () => ipcRenderer.invoke('injector:stop'),

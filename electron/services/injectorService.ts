@@ -106,6 +106,38 @@ export class InjectorService {
   }
 
   /**
+   * Setup from a user-provided path (browse).
+   */
+  setupFromPath(folderPath: string): { success: boolean; message: string } {
+    // Check if the folder itself has cslol-manager.exe
+    const candidates = [
+      folderPath,
+      path.join(folderPath, 'cslol-manager'),
+    ];
+    for (const dir of candidates) {
+      const exe = path.join(dir, 'cslol-manager.exe');
+      const tools = path.join(dir, 'cslol-tools', 'mod-tools.exe');
+      if (fs.existsSync(exe) && fs.existsSync(tools)) {
+        // Copy to our basePath so it's always next to the app
+        const dest = path.join(this.basePath, 'cslol-manager');
+        if (dest !== dir) {
+          try {
+            if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
+            fs.cpSync(dir, dest, { recursive: true });
+          } catch (e: any) {
+            return { success: false, message: `Failed to copy: ${e.message}` };
+          }
+        }
+        if (this.findCslol()) {
+          this.writeConfig();
+          return { success: true, message: 'CSLoL Manager configured!' };
+        }
+      }
+    }
+    return { success: false, message: 'cslol-manager.exe not found in selected folder' };
+  }
+
+  /**
    * Write config.ini for cslol-manager.exe
    */
   private writeConfig() {
