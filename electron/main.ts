@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { AssetService } from './services/assetService';
@@ -17,25 +17,24 @@ let skinGenerator: SkinGenerator;
 let skinScanner: SkinScanner;
 let injector: InjectorService;
 
-function findCslolToolsDir(basePath: string): string | null {
-  const cslolDir = path.join(basePath, 'cslol-manager');
-  if (!fs.existsSync(cslolDir)) return null;
-  const walk = (dir: string, d: number): string | null => {
-    if (d > 4) return null;
-    try {
-      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (e.isFile() && e.name === 'mod-tools.exe') return dir;
-        if (e.isDirectory()) { const r = walk(path.join(dir, e.name), d + 1); if (r) return r; }
-      }
-    } catch {} return null;
-  };
-  return walk(cslolDir, 0);
+// Simple settings store
+const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
+function loadSettings(): Record<string, string> {
+  try { return JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); } catch { return {}; }
+}
+function saveSettings(s: Record<string, string>) {
+  fs.writeFileSync(settingsFile(), JSON.stringify(s, null, 2));
+}
+function getSetting(key: string): string {
+  return loadSettings()[key] || '';
+}
+function setSetting(key: string, val: string) {
+  const s = loadSettings(); s[key] = val; saveSettings(s);
 }
 
 const isDev = !app.isPackaged;
-const LOL_SKINS_DIR = isDev
-  ? path.join(__dirname, '..', 'lol-skins')
-  : path.join(path.dirname(app.getPath('exe')), 'lol-skins');
+const appDir = isDev ? path.join(__dirname, '..') : path.dirname(app.getPath('exe'));
+const LOL_SKINS_DIR = path.join(appDir, 'lol-skins');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -46,7 +45,6 @@ function createWindow() {
       contextIsolation: true, nodeIntegration: false,
     },
   });
-
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
@@ -58,8 +56,6 @@ function createWindow() {
 
 function initServices() {
   const ud = app.getPath('userData');
-  // App install directory — where the exe lives (e.g. AppData\Local\Programs\riftchanger)
-  const appDir = isDev ? path.join(__dirname, '..') : path.dirname(app.getPath('exe'));
   assetService = new AssetService(path.join(ud, 'cache'));
   gameDetector = new GameDetector();
   backupService = new BackupService(path.join(ud, 'backups'));
@@ -68,30 +64,29 @@ function initServices() {
   injector = new InjectorService(appDir);
   setWadMakeConfig(ud);
 
-  // Pass cslol-tools dir to generator — check multiple locations
-  const toolsCandidates = [
-    path.join(appDir, 'cslol-manager', 'cslol-tools'),
-    path.join(appDir, 'cslol-manager', 'cslol-manager', 'cslol-tools'),
-    path.join(ud, 'cslol-manager', 'cslol-manager', 'cslol-tools'),
-    path.join(ud, 'cslol-manager', 'cslol-tools'),
-    path.join(process.env.USERPROFILE || '', 'Downloads', 'cslol-manager', 'cslol-tools'),
-  ];
-  for (const td of toolsCandidates) {
-    if (fs.existsSync(path.join(td, 'mod-tools.exe'))) { skinGenerator.setToolsDir(td); break; }
+  // Restore saved settings
+  const savedToolsPath = getSetting('cslolToolsPath');
+  if (savedToolsPath && injector.testToolsPath(savedToolsPath)) {
+    injector.setToolsPath(savedToolsPath.includes('mod-tools.exe') ? path.dirname(savedToolsPath) : savedToolsPath);
+  }
+  const savedGamePath = getSetting('leagueGamePath') || 'C:\\Riot Games\\League of Legends\\Game';
+  injector.setGamePath(savedGamePath);
+
+  // Set tools dir for generator
+  if (injector.isReady()) {
+    skinGenerator.setToolsDir(injector.getToolsPath());
   }
 
   fs.mkdirSync(LOL_SKINS_DIR, { recursive: true });
 }
 
 function registerIPC() {
+  // Window controls
   ipcMain.on('window:minimize', () => mainWindow?.minimize());
-  ipcMain.on('window:maximize', () => {
-    if (mainWindow?.isMaximized()) mainWindow.unmaximize();
-    else mainWindow?.maximize();
-  });
+  ipcMain.on('window:maximize', () => mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize());
   ipcMain.on('window:close', () => mainWindow?.close());
 
-  // Data
+  // Data APIs
   ipcMain.handle('getSkinsPath', () => LOL_SKINS_DIR);
   ipcMain.handle('scan', (_e, p?: string) => skinScanner.scan(p || LOL_SKINS_DIR));
   ipcMain.handle('getChampions', () => assetService.getChampions());
@@ -99,34 +94,100 @@ function registerIPC() {
   ipcMain.handle('getPatch', () => assetService.getCurrentPatch());
   ipcMain.handle('detectGame', () => gameDetector.detect());
 
-  // Injector
-  ipcMain.handle('injector:isReady', () => injector.isReady());
-  ipcMain.handle('injector:status-info', () => injector.getStatus());
-  ipcMain.handle('injector:setup', (_e, force?: boolean) => {
-    return injector.setup(force, (pct, msg) => {
-      mainWindow?.webContents.send('injector:setupProgress', { pct, msg });
-    });
+  // Settings
+  ipcMain.handle('getSettings', () => loadSettings());
+  ipcMain.handle('updateSetting', (_e, key: string, val: string) => {
+    setSetting(key, val);
+    if (key === 'cslolToolsPath' && val) {
+      const candidates = [val, path.join(val, 'cslol-tools')];
+      for (const c of candidates) {
+        if (fs.existsSync(path.join(c, 'mod-tools.exe'))) {
+          injector.setToolsPath(c);
+          skinGenerator.setToolsDir(c);
+          break;
+        }
+      }
+    }
+    if (key === 'leagueGamePath' && val) injector.setGamePath(val);
+    return { success: true };
   });
-  ipcMain.handle('injector:setupFromPath', (_e, p: string) => injector.setupFromPath(p));
-  ipcMain.handle('injector:import', (_e, zipPath: string, modName: string) => injector.importMod(zipPath, modName));
-  ipcMain.handle('injector:apply', (_e, modNames?: string[]) => injector.apply(modNames));
-  ipcMain.handle('injector:stop', () => { injector.stopOverlay(); return { success: true }; });
-  ipcMain.handle('injector:listMods', () => injector.listMods());
-  ipcMain.handle('injector:removeMod', (_e, name: string) => injector.removeMod(name));
-  ipcMain.handle('injector:removeAll', () => { injector.removeAllMods(); return true; });
-  ipcMain.handle('injector:status', () => injector.getOverlayStatus());
+
+  // Tools availability
+  ipcMain.handle('checkToolsAvailability', () => injector.checkToolsAvailability());
+  ipcMain.handle('testLeaguePath', (_e, p: string) => injector.testLeaguePath(p));
+
+  // Download cslol-manager
+  ipcMain.handle('downloadRepository', async (_e, repoType: string) => {
+    if (repoType === 'cslol-manager') {
+      const result = await injector.downloadCslol((data) => {
+        mainWindow?.webContents.send('downloadProgress', data);
+      });
+      if (result.success && result.suggestedPath) {
+        setSetting('cslolToolsPath', result.suggestedPath);
+        skinGenerator.setToolsDir(result.suggestedPath);
+      }
+      return { ...result, autoSaved: result.success };
+    }
+    return { success: false, error: 'Unknown repo type' };
+  });
+
+  // Injection
+  ipcMain.handle('inject-skin', async (_e, championName: string, skinName: string, skinPath: string) => {
+    return injector.injectSkin(championName, skinName, skinPath);
+  });
+  ipcMain.handle('remove-skin', async (_e, championName: string) => {
+    return injector.removeSkin(championName);
+  });
+  ipcMain.handle('remove-all-skins', async () => {
+    return injector.removeAllSkins();
+  });
+  ipcMain.handle('get-applied-mods', () => injector.getAppliedMods());
+
+  // Find skin/chroma files in lol-skins folder
+  ipcMain.handle('findSkinFiles', (_e, skinsFolder: string, championName: string) => {
+    try {
+      const champDir = path.join(skinsFolder, championName);
+      if (!fs.existsSync(champDir)) return { success: false, skinFiles: [] };
+      const files = fs.readdirSync(champDir)
+        .filter(f => f.endsWith('.zip') || f.endsWith('.fantome'))
+        .map(f => ({ name: f.replace(/\.(zip|fantome)$/, ''), path: path.join(champDir, f) }));
+      return { success: true, skinFiles: files };
+    } catch { return { success: false, skinFiles: [] }; }
+  });
+
+  ipcMain.handle('findChromaFiles', (_e, skinsFolder: string, championName: string, skinName: string) => {
+    try {
+      const chromaDir = path.join(skinsFolder, championName, 'chromas', skinName);
+      if (!fs.existsSync(chromaDir)) return { success: false, chromaFiles: [] };
+      const files = fs.readdirSync(chromaDir)
+        .filter(f => f.endsWith('.zip') || f.endsWith('.fantome'))
+        .map(f => ({ name: f.replace(/\.(zip|fantome)$/, ''), path: path.join(chromaDir, f) }));
+      return { success: true, chromaFiles: files };
+    } catch { return { success: false, chromaFiles: [] }; }
+  });
+
+  ipcMain.handle('scanSkinsFolder', (_e, p: string) => {
+    try {
+      if (!fs.existsSync(p)) return { success: false };
+      // Check if it's a cslol-tools path (has mod-tools.exe)
+      if (fs.existsSync(path.join(p, 'mod-tools.exe'))) return { success: true };
+      // Check one level down
+      for (const sub of ['cslol-tools']) {
+        if (fs.existsSync(path.join(p, sub, 'mod-tools.exe'))) return { success: true };
+      }
+      // Check if it's a skins folder
+      const dirs = fs.readdirSync(p, { withFileTypes: true }).filter(d => d.isDirectory());
+      if (dirs.length > 0) return { success: true, champions: Object.fromEntries(dirs.map(d => [d.name, true])) };
+      return { success: false };
+    } catch { return { success: false }; }
+  });
 
   // Generator
   ipcMain.handle('gen:champion', async (_e, id: string) => {
     try {
-      if (!skinGenerator.toolsReady) {
-        const td = findCslolToolsDir(app.getPath('userData'));
-        if (td) skinGenerator.setToolsDir(td);
-      }
       const result = await skinGenerator.generateChampion(id, m => {
         try { mainWindow?.webContents.send('gen:progress', m); } catch {}
       });
-      // Send explicit done event
       try { mainWindow?.webContents.send('gen:championDone', result); } catch {}
       return result;
     } catch (e: any) {
@@ -137,10 +198,6 @@ function registerIPC() {
   });
   ipcMain.handle('gen:all', async () => {
     try {
-      if (!skinGenerator.toolsReady) {
-        const td = findCslolToolsDir(app.getPath('userData'));
-        if (td) skinGenerator.setToolsDir(td);
-      }
       return await skinGenerator.generateAll(p => mainWindow?.webContents.send('gen:allProgress', p));
     } catch (e: any) {
       return { total: 0, done: 0, current: '', errors: [e.message], generated: 0 };
@@ -156,17 +213,8 @@ function registerIPC() {
 app.whenReady().then(() => { initServices(); registerIPC(); createWindow(); });
 app.on('window-all-closed', () => app.quit());
 app.on('activate', () => { if (!mainWindow) createWindow(); });
-app.on('before-quit', () => {
-  // Stop overlay and clean up everything so skins don't stay applied after closing
-  try { injector?.stopOverlay(); } catch {}
-  try { injector?.removeAllMods(); } catch {}
-  // Force kill any leftover mod-tools processes
-  try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
-});
-
-// Also handle window close directly
+app.on('before-quit', () => { try { injector?.cleanup(); } catch {} });
 app.on('will-quit', () => {
-  try { injector?.stopOverlay(); } catch {}
-  try { injector?.removeAllMods(); } catch {}
+  try { injector?.cleanup(); } catch {}
   try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
 });

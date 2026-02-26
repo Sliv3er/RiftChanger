@@ -1,220 +1,174 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-interface Props { notify: (m: string, ok?: boolean) => void; onRescan: () => void; }
+interface Props {
+  notify: (msg: string, ok?: boolean) => void;
+  onRescan: () => void;
+}
 
 export default function Settings({ notify, onRescan }: Props) {
-  const [ready, setReady] = useState(false);
-  const [mods, setMods] = useState<string[]>([]);
-  const [skinPath, setSkinPath] = useState('');
-  const [overlay, setOverlay] = useState<{ running: boolean; log: string }>({ running: false, log: '' });
-  const [setupStatus, setSetupStatus] = useState<'idle' | 'downloading' | 'done' | 'error'>('idle');
-  const [setupMsg, setSetupMsg] = useState('');
-  const [setupPct, setSetupPct] = useState(0);
-  const [cslolVersion, setCslolVersion] = useState('');
+  const [cslolPath, setCslolPath] = useState('');
+  const [gamePath, setGamePath] = useState('');
+  const [skinsPath, setSkinsPath] = useState('');
+  const [toolsAvail, setToolsAvail] = useState<Record<string, boolean>>({});
+  const [gamePathOk, setGamePathOk] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [dlProgress, setDlProgress] = useState(0);
+  const [dlStatus, setDlStatus] = useState('');
 
+  // Load settings on mount
   useEffect(() => {
-    if (!window.api) return;
-    window.api.injectorReady().then(setReady);
-    window.api.injectorStatusInfo().then(info => {
-      setReady(info.ready);
-      if (info.version) setCslolVersion(info.version);
-    });
-    window.api.listMods().then(setMods);
-    window.api.getSkinsPath().then(setSkinPath);
-    window.api.overlayStatus().then(setOverlay);
-    window.api.onInjectorSetupProgress((d) => {
-      setSetupPct(d.pct);
-      setSetupMsg(d.msg);
-    });
-    const timer = setInterval(() => {
-      window.api.overlayStatus().then(setOverlay);
-      window.api.listMods().then(setMods);
-    }, 3000);
-    return () => clearInterval(timer);
+    (async () => {
+      const [settings, avail, sp] = await Promise.all([
+        window.api.getSettings(),
+        window.api.checkToolsAvailability(),
+        window.api.getSkinsPath(),
+      ]);
+      setCslolPath(settings.cslolToolsPath || '');
+      setGamePath(settings.leagueGamePath || 'C:\\Riot Games\\League of Legends\\Game');
+      setSkinsPath(sp || '');
+      setToolsAvail(avail);
+      if (settings.leagueGamePath) {
+        const r = await window.api.testLeaguePath(settings.leagueGamePath);
+        setGamePathOk(r.success);
+      }
+    })();
   }, []);
 
-  const setupAuto = async () => {
-    setSetupStatus('downloading');
-    setSetupMsg('Downloading latest CSLoL Manager...');
-    try {
-      const r = await window.api?.injectorSetup();
-      if (r?.success) {
-        setSetupStatus('done');
-        setSetupMsg('✅ CSLoL Manager installed successfully!');
-        setReady(true);
-        notify('CSLoL Manager ready!', true);
-      } else {
-        setSetupStatus('error');
-        setSetupMsg(`❌ ${r?.message || 'Setup failed'}`);
+  // Download progress listener
+  useEffect(() => {
+    const unsub = window.api.onDownloadProgress((data: any) => {
+      setDlProgress(data.progress || 0);
+      setDlStatus(data.status || '');
+      if (data.status === 'completed') {
+        setDownloading(null);
+        refreshTools();
+        notify('CSLoL Manager downloaded successfully');
       }
-    } catch (e: any) {
-      setSetupStatus('error');
-      setSetupMsg(`❌ ${e.message}`);
-    }
-  };
+    });
+    return unsub;
+  }, [notify]);
 
-  const setupBrowse = async () => {
-    const folder = await window.api?.selectFolder();
-    if (!folder) return;
-    setSetupStatus('downloading');
-    setSetupMsg('Checking folder...');
-    try {
-      const r = await window.api?.injectorSetupFromPath(folder);
-      if (r?.success) {
-        setSetupStatus('done');
-        setSetupMsg('✅ CSLoL Manager configured!');
-        setReady(true);
-        notify('CSLoL Manager ready!', true);
-      } else {
-        setSetupStatus('error');
-        setSetupMsg(`❌ ${r?.message || 'Invalid CSLoL Manager folder'}`);
-      }
-    } catch (e: any) {
-      setSetupStatus('error');
-      setSetupMsg(`❌ ${e.message}`);
+  const refreshTools = useCallback(async () => {
+    const avail = await window.api.checkToolsAvailability();
+    setToolsAvail(avail);
+  }, []);
+
+  const saveSetting = useCallback(async (key: string, val: string) => {
+    await window.api.updateSetting(key, val);
+    if (key === 'leagueGamePath') {
+      const r = await window.api.testLeaguePath(val);
+      setGamePathOk(r.success);
     }
-  };
+    refreshTools();
+  }, [refreshTools]);
+
+  const browseCslol = useCallback(async () => {
+    const p = await window.api.selectFolder();
+    if (p) { setCslolPath(p); saveSetting('cslolToolsPath', p); }
+  }, [saveSetting]);
+
+  const browseGame = useCallback(async () => {
+    const p = await window.api.selectFolder();
+    if (p) { setGamePath(p); saveSetting('leagueGamePath', p); }
+  }, [saveSetting]);
+
+  const downloadCslol = useCallback(async () => {
+    setDownloading('cslol-manager');
+    setDlProgress(0);
+    setDlStatus('starting');
+    const res = await window.api.downloadRepository('cslol-manager');
+    if (!res.success) {
+      setDownloading(null);
+      notify('Download failed: ' + (res.error || 'Unknown error'), false);
+    }
+  }, [notify]);
+
+  const Badge = ({ ok }: { ok: boolean }) => (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold"
+      style={{ background: ok ? 'rgba(10,207,131,0.15)' : 'rgba(232,64,87,0.15)', color: ok ? '#0ACF83' : '#E84057' }}>
+      <span className="w-2 h-2 rounded-full" style={{ background: ok ? '#0ACF83' : '#E84057' }} />
+      {ok ? 'Available' : 'Not found'}
+    </span>
+  );
 
   return (
-    <div className="h-full overflow-y-auto p-8" style={{ background: '#010A13' }}>
-      <div className="max-w-xl mx-auto space-y-5">
-        <h1 style={{ fontSize: 14, fontWeight: 600, color: '#C8AA6E', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-          Settings
-        </h1>
+    <div className="h-full overflow-y-auto custom-scrollbar p-6" style={{ background: '#010A13' }}>
+      <h1 className="text-xl font-bold mb-6" style={{ color: '#F0E6D2' }}>SETTINGS</h1>
 
-        {/* Library */}
-        <div style={{ background: '#0A1428', border: '1px solid #1E2328', borderRadius: 4, padding: 20 }}>
-          <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 6 }}>
-            Skin Library
-          </p>
-          <p style={{ fontSize: 10, color: '#5B5A56', wordBreak: 'break-all', marginBottom: 10 }}>{skinPath}</p>
-          <button onClick={onRescan} className="btn-outline">Rescan</button>
+      {/* CSLoL Tools Path */}
+      <div className="rounded-lg p-5 mb-4" style={{ background: '#0A0E13', border: '1px solid #1E2328' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-sm font-bold" style={{ color: '#C89B3C' }}>CSLoL TOOLS PATH</h2>
+          <Badge ok={!!toolsAvail['cslol-manager']} />
         </div>
-
-        {/* CSLoL Manager */}
-        <div style={{ background: '#0A1428', border: '1px solid #1E2328', borderRadius: 4, padding: 20 }}>
-          <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
-            CSLoL Manager
-          </p>
-
-          <div className="flex items-center gap-2 mb-3">
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: ready ? '#0ACE83' : '#C24B4B' }} />
-            <span style={{ fontSize: 12, color: '#F0E6D2' }}>
-              {ready ? `CSLoL Manager ready${cslolVersion ? ` (${cslolVersion})` : ''}` : 'Not installed'}
-            </span>
-          </div>
-
-          {!ready && setupStatus === 'idle' && (
-            <div className="space-y-2">
-              <p style={{ fontSize: 11, color: '#5B5A56', marginBottom: 8 }}>
-                CSLoL Manager is required to apply skins in-game. Download the latest version automatically or browse to an existing installation.
-              </p>
-              <div className="flex gap-2">
-                <button onClick={setupAuto} className="btn-gold">Download Latest</button>
-                <button onClick={setupBrowse} className="btn-outline">Browse Folder</button>
-              </div>
-            </div>
-          )}
-
-          {setupStatus === 'downloading' && (
-            <div className="space-y-2 anim-fade">
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: '#C8AA6E' }} />
-                <span style={{ fontSize: 11, color: '#C8AA6E' }}>{setupMsg}</span>
-              </div>
-              <div className="lol-progress">
-                <div className="lol-progress-fill" style={{ width: `${setupPct || 10}%`, transition: 'width 0.3s', animation: 'shimmer 1.5s infinite' }} />
-              </div>
-            </div>
-          )}
-
-          {(setupStatus === 'done' || setupStatus === 'error') && (
-            <p style={{
-              fontSize: 11, marginTop: 6, padding: '6px 10px', borderRadius: 4,
-              color: setupStatus === 'done' ? '#0ACE83' : '#C24B4B',
-              background: setupStatus === 'done' ? '#091E0F' : '#1E0A0A',
-            }}>
-              {setupMsg}
-            </p>
-          )}
-
-          {ready && (
-            <button onClick={async () => {
-              setSetupStatus('downloading');
-              setSetupMsg('Downloading latest CSLoL Manager...');
-              try {
-                const r = await window.api?.injectorSetup(true);
-                if (r?.success) {
-                  setSetupStatus('done');
-                  setSetupMsg('✅ CSLoL Manager reinstalled!');
-                  notify('CSLoL Manager updated!', true);
-                } else {
-                  setSetupStatus('error');
-                  setSetupMsg(`❌ ${r?.message || 'Failed'}`);
-                }
-              } catch (e: any) {
-                setSetupStatus('error');
-                setSetupMsg(`❌ ${e.message}`);
-              }
-            }} className="btn-outline" style={{ marginTop: 8 }}>
-              Reinstall / Update
-            </button>
-          )}
+        <div className="flex gap-2 mb-2">
+          <input value={cslolPath}
+            onChange={e => { setCslolPath(e.target.value); saveSetting('cslolToolsPath', e.target.value); }}
+            className="league-input flex-1" placeholder="Path to cslol-tools folder..." />
+          <button onClick={browseCslol}
+            className="px-4 py-2 text-sm font-bold rounded" style={{ background: '#1E2328', color: '#A09B8C' }}>
+            Browse
+          </button>
         </div>
-
-        {/* Overlay status */}
-        <div style={{ background: '#0A1428', border: '1px solid #1E2328', borderRadius: 4, padding: 20 }}>
-          <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Patcher Status
-          </p>
-          <div className="flex items-center gap-2 mb-2">
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: overlay.running ? '#0ACE83' : '#3C3C41' }} />
-            <span style={{ fontSize: 12, color: overlay.running ? '#0ACE83' : '#5B5A56' }}>
-              {overlay.running ? 'CSLoL Manager running' : 'Not running'}
-            </span>
-          </div>
-          {overlay.log && (
-            <pre style={{ fontSize: 9, color: '#5B5A56', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 80, overflow: 'auto', marginTop: 4 }}>
-              {overlay.log.slice(-500).trim()}
-            </pre>
-          )}
+        <div className="flex gap-2">
+          <button onClick={downloadCslol} disabled={!!downloading}
+            className="px-4 py-2 text-sm font-bold rounded disabled:opacity-50"
+            style={{ background: 'linear-gradient(180deg, #C89B3C 0%, #785A28 100%)', color: '#010A13' }}>
+            {downloading === 'cslol-manager' ? 'Downloading...' : 'Download Latest'}
+          </button>
+          <button onClick={refreshTools}
+            className="px-4 py-2 text-sm rounded" style={{ background: '#1E2328', color: '#A09B8C' }}>
+            Refresh Status
+          </button>
         </div>
-
-        {/* Active mods */}
-        {mods.length > 0 && (
-          <div style={{ background: '#0A1428', border: '1px solid #1E2328', borderRadius: 4, padding: 20 }}>
-            <div className="flex justify-between items-center mb-3">
-              <p style={{ fontSize: 10, color: '#A09B8C', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-                Active Mods ({mods.length})
-              </p>
-              <button onClick={async () => {
-                await window.api?.removeAllMods(); setMods([]); notify('All mods cleared', true);
-              }} style={{ fontSize: 10, color: '#C24B4B', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Clear All
-              </button>
+        {downloading === 'cslol-manager' && (
+          <div className="mt-3">
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: '#1E2328' }}>
+              <div className="h-full transition-all" style={{ width: `${dlProgress}%`, background: 'linear-gradient(90deg, #C89B3C, #F0E6D2)' }} />
             </div>
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {mods.map((m, i) => (
-                <div key={i} className="flex justify-between items-center py-1">
-                  <span style={{ fontSize: 11, color: '#F0E6D2' }} className="truncate">{m}</span>
-                  <button onClick={async () => {
-                    await window.api?.removeMod(m);
-                    setMods(await window.api?.listMods() || []);
-                  }} style={{ color: '#C24B4B', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, marginLeft: 8 }}>✕</button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-3">
-              <button onClick={async () => {
-                const r = await window.api?.applyMods();
-                if (r) notify(r.message, r.success);
-              }} className="btn-gold">Apply All</button>
-              <button onClick={async () => {
-                await window.api?.stopOverlay(); notify('Patcher stopped', true);
-              }} className="btn-outline">Stop Patcher</button>
-            </div>
+            <div className="text-xs mt-1" style={{ color: '#5B5A56' }}>{dlStatus} ({dlProgress}%)</div>
           </div>
         )}
+      </div>
+
+      {/* League Game Path */}
+      <div className="rounded-lg p-5 mb-4" style={{ background: '#0A0E13', border: '1px solid #1E2328' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-sm font-bold" style={{ color: '#C89B3C' }}>LEAGUE GAME PATH</h2>
+          <Badge ok={gamePathOk} />
+        </div>
+        <div className="flex gap-2">
+          <input value={gamePath}
+            onChange={e => { setGamePath(e.target.value); saveSetting('leagueGamePath', e.target.value); }}
+            className="league-input flex-1" placeholder="Path to League of Legends/Game..." />
+          <button onClick={browseGame}
+            className="px-4 py-2 text-sm font-bold rounded" style={{ background: '#1E2328', color: '#A09B8C' }}>
+            Browse
+          </button>
+        </div>
+      </div>
+
+      {/* Skins Folder */}
+      <div className="rounded-lg p-5 mb-4" style={{ background: '#0A0E13', border: '1px solid #1E2328' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-sm font-bold" style={{ color: '#C89B3C' }}>SKINS FOLDER</h2>
+          <Badge ok={!!toolsAvail['lol-skins']} />
+        </div>
+        <div className="flex gap-2">
+          <input value={skinsPath} readOnly className="league-input flex-1 opacity-70" />
+        </div>
+        <p className="text-xs mt-2" style={{ color: '#5B5A56' }}>
+          Located at: {skinsPath} (bundled with app)
+        </p>
+      </div>
+
+      {/* Info */}
+      <div className="rounded-lg p-5" style={{ background: '#0A0E13', border: '1px solid #1E2328' }}>
+        <h2 className="text-sm font-bold mb-2" style={{ color: '#C89B3C' }}>ABOUT</h2>
+        <p className="text-xs" style={{ color: '#5B5A56' }}>
+          RiftChanger — Custom skin manager for League of Legends.<br />
+          Uses CSLoL Tools for skin injection. Close the app to remove all applied skins.
+        </p>
       </div>
     </div>
   );

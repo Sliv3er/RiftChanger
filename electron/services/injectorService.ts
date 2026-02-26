@@ -1,410 +1,309 @@
 /**
- * InjectorService — uses the actual cslol-manager.exe for injection.
- * 
- * mod-tools.exe alone causes C0000229 DLL injection errors.
- * cslol-manager.exe has its own built-in patcher that works correctly.
- * 
- * Workflow:
- * 1. Download/detect cslol-manager installation (latest from LeagueToolkit GitHub)
- * 2. Import mods using mod-tools import into installed/ dir
- * 3. Write profile config (current.profile + profiles/<name>.profile)
- * 4. Launch cslol-manager.exe — user clicks "Run" in its window
+ * InjectorService — matches Rift app injection approach exactly.
+ * Uses mod-tools.exe directly: import → mkoverlay → runoverlay
+ * installed/ and profiles/ dirs live INSIDE the cslol-tools directory.
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn, execFile, execFileSync, ChildProcess } from 'child_process';
+import { spawn, execFile, ChildProcess } from 'child_process';
 import axios from 'axios';
 
-const CSLOL_LATEST_API = 'https://api.github.com/repos/LeagueToolkit/cslol-manager/releases/latest';
+interface AppliedMod {
+  name: string;
+  type: string;
+  profilePath: string;
+  championName: string;
+  skinName: string;
+  appliedAt: string;
+  zipPath: string;
+}
 
-let overlayLog = '';
+const CSLOL_LATEST_API = 'https://api.github.com/repos/LeagueToolkit/cslol-manager/releases/latest';
+const SEVEN_ZIP = 'C:\\Program Files\\AMD\\AMDInstallManager\\7z.exe';
 
 export class InjectorService {
-  private basePath: string;
-  private cslolRoot = '';
-  private cslolExe = '';
-  private toolsDir = '';
+  private basePath: string; // exe-relative dir
+  private toolsPath = '';   // cslol-tools dir containing mod-tools.exe
   private modToolsExe = '';
   private installedDir = '';
   private profilesDir = '';
-  private gamePath = 'C:\\Riot Games\\League of Legends\\Game';
-  private cslolProcess: ChildProcess | null = null;
+  private gamePath = '';
+  private appliedMods = new Map<string, AppliedMod>();
+  private overlayProcess: ChildProcess | null = null;
 
   constructor(basePath: string) {
     this.basePath = basePath;
-    this.findCslol();
+    this.autoDetectTools();
   }
 
-  private findCslol(): boolean {
+  /** Auto-detect cslol-tools from exe-relative paths */
+  private autoDetectTools(): boolean {
     const candidates = [
-      path.join(this.basePath, 'cslol-manager'),
-      path.join(this.basePath, 'cslol-manager', 'cslol-manager'),
-      path.join(process.env.APPDATA || '', 'riftchanger', 'cslol-manager'),
-      path.join(process.env.APPDATA || '', 'riftchanger', 'cslol-manager', 'cslol-manager'),
-      path.join(process.env.USERPROFILE || '', 'Downloads', 'cslol-manager'),
+      path.join(this.basePath, 'cslol-manager', 'cslol-manager', 'cslol-tools'),
+      path.join(this.basePath, 'cslol-manager', 'cslol-tools'),
+      path.join(this.basePath, 'cslol-tools'),
     ];
-
-    for (const dir of candidates) {
-      const exe = path.join(dir, 'cslol-manager.exe');
-      const tools = path.join(dir, 'cslol-tools');
-      const modTools = path.join(tools, 'mod-tools.exe');
-      
-      if (fs.existsSync(exe) && fs.existsSync(modTools)) {
-        this.cslolRoot = dir;
-        this.cslolExe = exe;
-        this.toolsDir = tools;
-        this.modToolsExe = modTools;
-        this.installedDir = path.join(dir, 'installed');
-        this.profilesDir = path.join(dir, 'profiles');
-        fs.mkdirSync(this.installedDir, { recursive: true });
-        fs.mkdirSync(this.profilesDir, { recursive: true });
+    for (const p of candidates) {
+      const mt = path.join(p, 'mod-tools.exe');
+      if (fs.existsSync(mt)) {
+        this.setToolsPath(p);
         return true;
       }
     }
     return false;
   }
 
+  setToolsPath(p: string) {
+    this.toolsPath = p;
+    this.modToolsExe = path.join(p, 'mod-tools.exe');
+    this.installedDir = path.join(p, 'installed');
+    this.profilesDir = path.join(p, 'profiles');
+    fs.mkdirSync(this.installedDir, { recursive: true });
+    fs.mkdirSync(this.profilesDir, { recursive: true });
+  }
+
+  setGamePath(p: string) { this.gamePath = p; }
+
   isReady(): boolean {
-    return !!this.cslolExe && fs.existsSync(this.cslolExe) 
-      && !!this.modToolsExe && fs.existsSync(this.modToolsExe);
+    return !!this.modToolsExe && fs.existsSync(this.modToolsExe);
   }
 
-  getStatus(): { ready: boolean; version: string; path: string } {
-    if (!this.isReady()) return { ready: false, version: '', path: '' };
-    let version = '';
-    try {
-      const vFile = path.join(this.cslolRoot, 'version.txt');
-      if (fs.existsSync(vFile)) version = fs.readFileSync(vFile, 'utf8').trim().replace('Version: ', '');
-    } catch {}
-    return { ready: true, version, path: this.cslolRoot };
+  checkToolsAvailability(): { 'cslol-manager': boolean; 'lol-skins': boolean } {
+    const cslol = this.isReady();
+    const lolSkins = fs.existsSync(path.join(this.basePath, 'lol-skins'));
+    return { 'cslol-manager': cslol, 'lol-skins': lolSkins };
   }
 
-  /**
-   * Download and install latest cslol-manager from GitHub releases.
-   * The release asset is a 7z SFX .exe — we extract it using the embedded 7z or a fallback.
-   */
-  async setup(forceReinstall = false, onProgress?: (pct: number, msg: string) => void): Promise<{ success: boolean; message: string }> {
-    if (!forceReinstall && this.isReady() && this.cslolRoot.startsWith(this.basePath)) {
-      return { success: true, message: 'cslol-manager ready' };
+  getToolsPath(): string { return this.toolsPath; }
+
+  /** Test if a path contains mod-tools.exe */
+  testToolsPath(p: string): boolean {
+    const candidates = [p, path.join(p, 'cslol-tools')];
+    for (const c of candidates) {
+      if (fs.existsSync(path.join(c, 'mod-tools.exe'))) return true;
     }
+    return false;
+  }
 
+  /** Test if league game path is valid */
+  testLeaguePath(p: string): { success: boolean } {
+    return { success: fs.existsSync(path.join(p, 'League of Legends.exe')) };
+  }
+
+  /** Download latest cslol-manager from GitHub */
+  async downloadCslol(onProgress?: (data: { progress: number; status: string; repoType: string }) => void): Promise<{ success: boolean; error?: string; suggestedPath?: string }> {
     try {
-      onProgress?.(0, 'Fetching latest release info...');
+      onProgress?.({ progress: 5, status: 'starting', repoType: 'cslol-manager' });
 
-      // Get latest release info
       const releaseRes = await axios.get(CSLOL_LATEST_API, {
-        headers: { 'User-Agent': 'RiftChanger/1.0' },
-        timeout: 15000,
+        headers: { 'User-Agent': 'RiftChanger/1.0' }, timeout: 15000
       });
-      const release = releaseRes.data;
-      const winAsset = release.assets?.find((a: any) => a.name?.includes('windows'));
-      if (!winAsset) return { success: false, message: 'No Windows asset found in latest release' };
+      const winAsset = releaseRes.data.assets?.find((a: any) => a.name?.includes('windows'));
+      if (!winAsset) return { success: false, error: 'No Windows asset in latest release' };
 
-      const downloadUrl = winAsset.browser_download_url;
-      const totalSize = winAsset.size || 0;
-      const version = release.tag_name || 'unknown';
+      onProgress?.({ progress: 10, status: 'downloading', repoType: 'cslol-manager' });
 
-      onProgress?.(5, `Downloading ${version} (${Math.round(totalSize / 1024 / 1024)}MB)...`);
-
-      // Download the .exe (7z SFX archive)
       const dlPath = path.join(this.basePath, 'cslol-manager-windows.exe');
-      const dlDir = path.join(this.basePath, 'cslol-manager');
+      const totalSize = winAsset.size || 0;
 
-      const res = await axios.get(downloadUrl, {
+      const res = await axios.get(winAsset.browser_download_url, {
         responseType: 'arraybuffer',
         headers: { 'User-Agent': 'RiftChanger/1.0' },
         timeout: 300000,
         maxContentLength: 500 * 1024 * 1024,
         onDownloadProgress: (evt) => {
           if (totalSize > 0 && evt.loaded) {
-            const pct = 5 + Math.round((evt.loaded / totalSize) * 70);
-            onProgress?.(Math.min(pct, 75), `Downloading... ${Math.round(evt.loaded / 1024 / 1024)}/${Math.round(totalSize / 1024 / 1024)}MB`);
+            const pct = 10 + Math.round((evt.loaded / totalSize) * 60);
+            onProgress?.({ progress: Math.min(pct, 70), status: 'downloading', repoType: 'cslol-manager' });
           }
         },
       });
 
       fs.writeFileSync(dlPath, Buffer.from(res.data));
-      onProgress?.(80, 'Extracting...');
+      onProgress?.({ progress: 75, status: 'extracting', repoType: 'cslol-manager' });
 
-      // Clean target dir
-      if (fs.existsSync(dlDir)) {
-        fs.rmSync(dlDir, { recursive: true, force: true });
-      }
-      fs.mkdirSync(dlDir, { recursive: true });
+      const destDir = path.join(this.basePath, 'cslol-manager');
+      if (fs.existsSync(destDir)) fs.rmSync(destDir, { recursive: true, force: true });
+      fs.mkdirSync(destDir, { recursive: true });
 
-      // Extract the 7z SFX exe
-      const extracted = await this.extract7zSfx(dlPath, dlDir);
-      if (!extracted) {
-        // Cleanup and fail
-        try { fs.unlinkSync(dlPath); } catch {}
-        return { success: false, message: 'Failed to extract cslol-manager. Install 7-Zip or manually extract.' };
+      // Extract 7z SFX
+      if (fs.existsSync(SEVEN_ZIP)) {
+        try {
+          require('child_process').execFileSync(SEVEN_ZIP, ['x', dlPath, `-o${destDir}`, '-y'], { timeout: 120000, windowsHide: true });
+        } catch {}
       }
 
-      // Cleanup download
       try { fs.unlinkSync(dlPath); } catch {}
 
-      onProgress?.(95, 'Configuring...');
+      onProgress?.({ progress: 90, status: 'organizing', repoType: 'cslol-manager' });
 
-      if (this.findCslol()) {
-        this.writeConfig();
-        onProgress?.(100, 'Done!');
-        return { success: true, message: `CSLoL Manager ${version} installed!` };
+      // Find the cslol-tools dir in extracted content
+      if (this.autoDetectTools()) {
+        onProgress?.({ progress: 100, status: 'completed', repoType: 'cslol-manager' });
+        return { success: true, suggestedPath: this.toolsPath };
       }
 
-      return { success: false, message: 'cslol-manager.exe not found after extraction' };
+      return { success: false, error: 'mod-tools.exe not found after extraction' };
     } catch (e: any) {
-      return { success: false, message: e.message };
+      return { success: false, error: e.message };
     }
   }
 
-  /**
-   * Extract a 7z SFX .exe to a destination folder.
-   * Tries multiple 7z locations, then falls back to running the SFX exe itself.
-   */
-  private async extract7zSfx(sfxPath: string, destDir: string): Promise<boolean> {
-    // Try to find 7z.exe on the system
-    const sevenZipPaths = [
-      'C:\\Program Files\\7-Zip\\7z.exe',
-      'C:\\Program Files (x86)\\7-Zip\\7z.exe',
-      'C:\\Program Files\\AMD\\AMDInstallManager\\7z.exe',  // Available on this machine
-    ];
+  /** Inject a skin — matches Rift's inject-skin handler exactly */
+  async injectSkin(championName: string, skinName: string, skinPath: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.isReady()) return { success: false, error: 'CSLoL Tools not configured. Go to Settings.' };
+    if (!this.gamePath) return { success: false, error: 'League game path not configured.' };
+    if (!fs.existsSync(skinPath)) return { success: false, error: 'Mod file not found: ' + skinPath };
 
-    for (const szPath of sevenZipPaths) {
-      if (fs.existsSync(szPath)) {
-        try {
-          execFileSync(szPath, ['x', sfxPath, `-o${destDir}`, '-y'], {
-            timeout: 120000,
-            windowsHide: true,
-          });
-          // Check if extracted properly — might be in a subfolder
-          const files = fs.readdirSync(destDir);
-          if (files.includes('cslol-manager.exe')) return true;
-          // Check one level deep
-          for (const f of files) {
-            const sub = path.join(destDir, f);
-            if (fs.statSync(sub).isDirectory() && fs.existsSync(path.join(sub, 'cslol-manager.exe'))) {
-              // Move contents up
-              for (const inner of fs.readdirSync(sub)) {
-                fs.renameSync(path.join(sub, inner), path.join(destDir, inner));
-              }
-              fs.rmdirSync(sub);
-              return true;
-            }
-          }
-          return files.length > 0;
-        } catch {}
+    // Kill existing overlay
+    this.killOverlay();
+    await new Promise(r => setTimeout(r, 1000));
+
+    const modName = path.basename(skinPath).replace(/\.(zip|fantome|wad\.client)$/i, '').replace(/[^a-zA-Z0-9_\-. ]/g, '_');
+    const modInstallPath = path.join(this.installedDir, modName);
+
+    // Dynamic timeout
+    const stats = fs.statSync(skinPath);
+    const sizeMB = stats.size / (1024 * 1024);
+    let timeout = 45000;
+    if (sizeMB > 100) timeout = 600000;
+    else if (sizeMB > 50) timeout = 300000;
+    else if (sizeMB > 20) timeout = 120000;
+
+    // Step 1: Import
+    try {
+      await this.execMod(['import', skinPath, modInstallPath, `--game:${this.gamePath}`, '--noTFT'], timeout);
+    } catch (e: any) {
+      return { success: false, error: `Import failed: ${e.message}` };
+    }
+
+    // Track
+    this.appliedMods.set(skinPath, {
+      name: modName, type: 'skin', profilePath: modInstallPath,
+      championName, skinName, appliedAt: new Date().toISOString(), zipPath: skinPath
+    });
+
+    // Step 2: Unified overlay
+    const allModNames = Array.from(this.appliedMods.values()).map(m => m.name);
+    const profilePath = path.join(this.profilesDir, 'RiftChanger_Unified');
+
+    try {
+      await this.execMod([
+        'mkoverlay', this.installedDir, profilePath,
+        `--game:${this.gamePath}`, `--mods:${allModNames.join('/')}`,
+        '--noTFT', '--ignoreConflict'
+      ], timeout);
+    } catch (e: any) {
+      this.appliedMods.delete(skinPath);
+      return { success: false, error: `Overlay failed: ${e.message}` };
+    }
+
+    // Step 3: Run overlay
+    const configPath = profilePath + '.config';
+    this.overlayProcess = spawn(this.modToolsExe, [
+      'runoverlay', profilePath, configPath,
+      `--game:${this.gamePath}`, '--opts:none'
+    ], { stdio: 'pipe', windowsHide: true, detached: false });
+
+    this.overlayProcess.on('error', () => {});
+    this.overlayProcess.on('close', () => { this.overlayProcess = null; });
+
+    return { success: true };
+  }
+
+  /** Remove a specific champion's skin */
+  async removeSkin(championName: string): Promise<{ success: boolean }> {
+    // Find and remove from applied mods
+    for (const [key, mod] of this.appliedMods.entries()) {
+      if (mod.championName === championName) {
+        // Remove installed dir
+        try { fs.rmSync(mod.profilePath, { recursive: true, force: true }); } catch {}
+        this.appliedMods.delete(key);
+        break;
       }
     }
 
-    // Fallback: run the SFX exe with /S (silent) flag — some SFX archives support this
-    try {
-      execFileSync(sfxPath, ['-o' + destDir, '-y'], { timeout: 60000, windowsHide: true });
-      if (fs.existsSync(path.join(destDir, 'cslol-manager.exe'))) return true;
-    } catch {}
+    this.killOverlay();
+    await new Promise(r => setTimeout(r, 500));
 
-    return false;
-  }
-
-  /**
-   * Setup from a user-provided path (browse button).
-   */
-  setupFromPath(folderPath: string): { success: boolean; message: string } {
-    const candidates = [folderPath, path.join(folderPath, 'cslol-manager')];
-    for (const dir of candidates) {
-      const exe = path.join(dir, 'cslol-manager.exe');
-      const tools = path.join(dir, 'cslol-tools', 'mod-tools.exe');
-      if (fs.existsSync(exe) && fs.existsSync(tools)) {
-        const dest = path.join(this.basePath, 'cslol-manager');
-        if (path.resolve(dest) !== path.resolve(dir)) {
-          try {
-            if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
-            fs.cpSync(dir, dest, { recursive: true });
-          } catch (e: any) {
-            return { success: false, message: `Failed to copy: ${e.message}` };
-          }
-        }
-        if (this.findCslol()) {
-          this.writeConfig();
-          const status = this.getStatus();
-          return { success: true, message: `CSLoL Manager configured! Version: ${status.version || 'unknown'}` };
-        }
-      }
-    }
-    return { success: false, message: 'Could not find cslol-manager.exe + cslol-tools/mod-tools.exe in selected folder' };
-  }
-
-  private writeConfig() {
-    const configPath = path.join(this.cslolRoot, 'config.ini');
-    const config = [
-      '[General]',
-      'themeDarkMode=true',
-      `leaguePath=${this.gamePath.replace(/\\/g, '/')}`,
-      'detectGamePath=true',
-      'blacklist=true',
-      'removeUnknownNames=true',
-      'ignorebad=false',
-      'enableSystray=false',
-      'verbosePatcher=false',
-      'enableAutoRun=false',
-      'suppressInstallConflicts=true',
-      'windowHeight=1',
-      'windowWidth=1',
-      'windowMaximised=false',
-    ].join('\n');
-    fs.writeFileSync(configPath, config);
-  }
-
-  importMod(zipPath: string, modName: string): { success: boolean; message: string } {
-    try {
-      const safe = modName.replace(/[<>:"/\\|?*]/g, '_');
-      const modDir = path.join(this.installedDir, safe);
-      if (fs.existsSync(modDir)) fs.rmSync(modDir, { recursive: true, force: true });
-
+    // Rebuild overlay if there are remaining mods
+    if (this.appliedMods.size > 0) {
+      const allModNames = Array.from(this.appliedMods.values()).map(m => m.name);
+      const profilePath = path.join(this.profilesDir, 'RiftChanger_Unified');
       try {
-        execFileSync(this.modToolsExe, [
-          'import', zipPath, modDir, `--game:${this.gamePath}`, '--noTFT'
-        ], { timeout: 60000, windowsHide: true, cwd: this.toolsDir });
-      } catch {
-        // Fallback: manual extract
-        if (!fs.existsSync(path.join(modDir, 'WAD'))) {
-          const AdmZip = require('adm-zip');
-          const zip = new AdmZip(zipPath);
-          zip.extractAllTo(modDir, true);
-        }
-      }
-
-      const wadDir = path.join(modDir, 'WAD');
-      if (!fs.existsSync(wadDir) || !fs.readdirSync(wadDir).some((f: string) => f.endsWith('.wad.client'))) {
-        try { fs.rmSync(modDir, { recursive: true, force: true }); } catch {}
-        return { success: false, message: `Invalid mod: ${modName}` };
-      }
-      return { success: true, message: `Imported: ${modName}` };
-    } catch (e: any) {
-      return { success: false, message: e.message };
-    }
-  }
-
-  async apply(modNames?: string[]): Promise<{ success: boolean; message: string }> {
-    if (!this.isReady()) return { success: false, message: 'cslol-manager not ready. Go to Settings → Setup.' };
-
-    let mods: string[];
-    if (modNames) {
-      mods = modNames.map(m => m.replace('.fantome', '').replace('.zip', '').replace(/[<>:"/\\|?*]/g, '_'));
-    } else {
-      mods = this.listMods();
-    }
-    if (mods.length === 0) return { success: false, message: 'No mods to apply' };
-
-    this.stopOverlay();
-    await new Promise(r => setTimeout(r, 1500));
-
-    const profileName = 'RiftChanger';
-    const profileFile = path.join(this.profilesDir, `${profileName}.profile`);
-    fs.writeFileSync(profileFile, mods.join('\n') + '\n');
-    fs.writeFileSync(path.join(this.cslolRoot, 'current.profile'), profileName);
-
-    const overlayDir = path.join(this.profilesDir, profileName);
-    if (fs.existsSync(overlayDir)) fs.rmSync(overlayDir, { recursive: true, force: true });
-    fs.mkdirSync(overlayDir, { recursive: true });
-
-    try {
-      await new Promise<void>((resolve, reject) => {
-        execFile(this.modToolsExe, [
-          'mkoverlay', this.installedDir, overlayDir,
-          `--game:${this.gamePath}`, `--mods:${mods.join('/')}`,
+        await this.execMod([
+          'mkoverlay', this.installedDir, profilePath,
+          `--game:${this.gamePath}`, `--mods:${allModNames.join('/')}`,
           '--noTFT', '--ignoreConflict'
-        ], { timeout: 180000, windowsHide: true, cwd: this.toolsDir }, (err, stdout, stderr) => {
-          if (err && !stdout?.includes('Done!')) reject(new Error(stderr || err.message));
-          else resolve();
-        });
-      });
-    } catch (e: any) {
-      return { success: false, message: `mkoverlay failed: ${e.message.slice(0, 300)}` };
+        ], 60000);
+
+        const configPath = profilePath + '.config';
+        this.overlayProcess = spawn(this.modToolsExe, [
+          'runoverlay', profilePath, configPath,
+          `--game:${this.gamePath}`, '--opts:none'
+        ], { stdio: 'pipe', windowsHide: true, detached: false });
+        this.overlayProcess.on('close', () => { this.overlayProcess = null; });
+      } catch {}
     }
 
-    this.writeConfig();
-
-    try {
-      overlayLog = '';
-      this.cslolProcess = spawn(this.cslolExe, [], {
-        cwd: this.cslolRoot,
-        windowsHide: false,
-        stdio: 'ignore',
-        detached: true,
-      });
-      this.cslolProcess.unref();
-
-      const logFile = path.join(overlayDir, 'log.txt');
-      const logInterval = setInterval(() => {
-        try {
-          if (fs.existsSync(logFile)) overlayLog = fs.readFileSync(logFile, 'utf8');
-        } catch {}
-      }, 2000);
-      this.cslolProcess.on('exit', () => {
-        clearInterval(logInterval);
-        this.cslolProcess = null;
-      });
-
-      return { 
-        success: true, 
-        message: `${mods.length} skin(s) ready! CSLoL Manager launched — click "Run" to start the patcher.` 
-      };
-    } catch (e: any) {
-      return { success: false, message: `Failed to launch cslol-manager: ${e.message}` };
-    }
+    return { success: true };
   }
 
-  stopOverlay() {
-    if (this.cslolProcess) {
-      try { this.cslolProcess.kill(); } catch {}
-      this.cslolProcess = null;
+  /** Remove all skins */
+  async removeAllSkins(): Promise<{ success: boolean }> {
+    this.killOverlay();
+    for (const [key, mod] of this.appliedMods.entries()) {
+      try { fs.rmSync(mod.profilePath, { recursive: true, force: true }); } catch {}
     }
-    try { require('child_process').execSync('taskkill /F /IM cslol-manager.exe 2>nul', { windowsHide: true }); } catch {}
+    this.appliedMods.clear();
+    // Clean profiles dir
+    const profilePath = path.join(this.profilesDir, 'RiftChanger_Unified');
+    try { fs.rmSync(profilePath, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(profilePath + '.config', { force: true }); } catch {}
+    return { success: true };
+  }
+
+  getAppliedMods(): { active: Record<string, { skinName: string; appliedAt: string }> } {
+    const active: Record<string, { skinName: string; appliedAt: string }> = {};
+    for (const mod of this.appliedMods.values()) {
+      active[mod.championName] = { skinName: mod.skinName, appliedAt: mod.appliedAt };
+    }
+    return { active };
+  }
+
+  getAppliedForChampion(championName: string): AppliedMod | undefined {
+    for (const mod of this.appliedMods.values()) {
+      if (mod.championName === championName) return mod;
+    }
+    return undefined;
+  }
+
+  killOverlay() {
+    if (this.overlayProcess) {
+      try { this.overlayProcess.kill(); } catch {}
+      this.overlayProcess = null;
+    }
     try { require('child_process').execSync('taskkill /F /IM mod-tools.exe 2>nul', { windowsHide: true }); } catch {}
   }
 
-  listMods(): string[] {
-    if (!fs.existsSync(this.installedDir)) return [];
-    return fs.readdirSync(this.installedDir, { withFileTypes: true })
-      .filter(e => e.isDirectory())
-      .map(e => e.name);
-  }
-
-  removeMod(name: string): boolean {
-    const safe = name.replace(/[<>:"/\\|?*]/g, '_');
-    const dir = path.join(this.installedDir, safe);
-    if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); return true; }
-    const all = this.listMods();
-    const match = all.find(m => m.includes(name) || name.includes(m));
-    if (match) { fs.rmSync(path.join(this.installedDir, match), { recursive: true, force: true }); return true; }
-    return false;
-  }
-
-  removeAllMods() {
-    this.stopOverlay();
-    for (const m of this.listMods()) {
-      try { fs.rmSync(path.join(this.installedDir, m), { recursive: true, force: true }); } catch {}
+  cleanup() {
+    this.killOverlay();
+    // Remove all installed mods on exit
+    for (const mod of this.appliedMods.values()) {
+      try { fs.rmSync(mod.profilePath, { recursive: true, force: true }); } catch {}
     }
-    const profilePath = path.join(this.profilesDir, 'RiftChanger');
-    try { if (fs.existsSync(profilePath)) fs.rmSync(profilePath, { recursive: true, force: true }); } catch {}
-    try { if (fs.existsSync(profilePath + '.profile')) fs.unlinkSync(profilePath + '.profile'); } catch {}
+    this.appliedMods.clear();
   }
 
-  getOverlayStatus(): { running: boolean; log: string } {
-    let running = false;
-    try {
-      const result = require('child_process').execSync('tasklist /FI "IMAGENAME eq cslol-manager.exe" /NH', { windowsHide: true, encoding: 'utf8' });
-      running = result.includes('cslol-manager.exe');
-    } catch {}
-
-    const logFile = path.join(this.profilesDir, 'RiftChanger', 'log.txt');
-    try {
-      if (fs.existsSync(logFile)) {
-        const content = fs.readFileSync(logFile, 'utf8');
-        if (content) overlayLog = content;
-      }
-    } catch {}
-
-    return { running, log: overlayLog || (running ? 'CSLoL Manager running' : 'Not running') };
+  private execMod(args: string[], timeout: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFile(this.modToolsExe, args, {
+        timeout, killSignal: 'SIGTERM', maxBuffer: 10 * 1024 * 1024,
+        windowsHide: true, cwd: this.toolsPath
+      }, (err, stdout, stderr) => {
+        if (err && !stdout?.includes('Done!')) reject(new Error(stderr || err.message));
+        else resolve(stdout || '');
+      });
+    });
   }
 }

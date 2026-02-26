@@ -37,7 +37,7 @@ export default function Generator({ notify, onDone }: Props) {
   }, [query, champions]);
 
   // Listen for gen:allProgress
-  useEffect(() => { window.api?.onGenAllProgress((p: any) => setProgress(p)); }, []);
+  useEffect(() => { window.api?.onGenAllProgress?.((p: any) => setProgress(p)); }, []);
 
   // Listen for single champion progress
   useEffect(() => { window.api?.onGenProgress((m: string) => setSingleProgress(m)); }, []);
