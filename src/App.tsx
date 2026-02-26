@@ -106,14 +106,14 @@ export default function App() {
             appliedMods={appliedMods} onApply={handleApply} onRemove={handleRemove} notify={notify} />
         </div>
         <div className={`absolute inset-0 ${page === 'applied' ? '' : 'hidden'}`}>
-          <AppliedSkins appliedMods={appliedMods} toolsReady={toolsReady}
+          <AppliedSkins patch={patch} appliedMods={appliedMods} toolsReady={toolsReady}
             onRemove={handleRemove} onRemoveAll={handleRemoveAll} notify={notify} />
         </div>
         <div className={`absolute inset-0 ${page === 'generator' ? '' : 'hidden'}`}>
           <Generator notify={notify} onDone={rescan} />
         </div>
         <div className={`absolute inset-0 ${page === 'settings' ? '' : 'hidden'}`}>
-          <Settings notify={notify} onRescan={rescan} />
+          <Settings notify={notify} onRescan={rescan} onToolsChanged={refreshTools} />
         </div>
       </div>
 
