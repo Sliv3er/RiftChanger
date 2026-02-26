@@ -55,6 +55,10 @@
     "win": {
       "target": [
         {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
           "target": "nsis",
           "arch": ["x64"]
         }
@@ -62,19 +66,23 @@
       "icon": "build/icon.ico",
       "requestedExecutionLevel": "asInvoker"
     },
+    "portable": {
+      "artifactName": "RiftChanger-Portable.exe",
+      "requestExecutionLevel": "user",
+      "unpackDirName": "RiftChanger"
+    },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "allowElevation": true,
-      "createDesktopShortcut": "always",
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "RiftChanger",
-      "runAfterFinish": true,
+      "runAfterFinish": false,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "artifactName": "RiftChanger-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false,
-      "installerHeaderIcon": "build/icon.ico",
       "include": "build/installer.nsh"
     }
   }
