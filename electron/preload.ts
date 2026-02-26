@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   detectGame: () => ipcRenderer.invoke('detectGame'),
 
   injectorReady: () => ipcRenderer.invoke('injector:isReady'),
-  injectorSetup: () => ipcRenderer.invoke('injector:setup'),
+  injectorSetup: (force?: boolean) => ipcRenderer.invoke('injector:setup', force),
   injectorSetupFromPath: (p: string) => ipcRenderer.invoke('injector:setupFromPath', p),
   importMod: (zip: string, name: string) => ipcRenderer.invoke('injector:import', zip, name),
   applyMods: (names?: string[]) => ipcRenderer.invoke('injector:apply', names),

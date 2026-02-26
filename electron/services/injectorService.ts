@@ -73,10 +73,17 @@ export class InjectorService {
     return !!this.cslolExe && fs.existsSync(this.cslolExe);
   }
 
-  async setup(): Promise<{ success: boolean; message: string }> {
-    if (this.isReady()) return { success: true, message: 'cslol-manager ready' };
+  async setup(forceReinstall = false): Promise<{ success: boolean; message: string }> {
+    // Only skip download if ready AND not forcing reinstall AND cslol is in our basePath (not a fallback)
+    if (!forceReinstall && this.isReady() && this.cslolRoot.startsWith(this.basePath)) {
+      return { success: true, message: 'cslol-manager ready' };
+    }
     try {
       const dlDir = path.join(this.basePath, 'cslol-manager');
+      // Clean existing to force fresh install
+      if (fs.existsSync(dlDir)) {
+        try { fs.rmSync(dlDir, { recursive: true, force: true }); } catch {}
+      }
       fs.mkdirSync(dlDir, { recursive: true });
       
       const rel = await axios.get(CSLOL_RELEASES_API, { headers: { 'User-Agent': 'RiftChanger/1.0' }, timeout: 15000 });

@@ -129,7 +129,24 @@ export default function Settings({ notify, onRescan }: Props) {
           )}
 
           {ready && (
-            <button onClick={setupAuto} className="btn-outline" style={{ marginTop: 8 }}>
+            <button onClick={async () => {
+              setSetupStatus('downloading');
+              setSetupMsg('Downloading latest CSLoL Manager...');
+              try {
+                const r = await window.api?.injectorSetup(true);
+                if (r?.success) {
+                  setSetupStatus('done');
+                  setSetupMsg('✅ CSLoL Manager reinstalled!');
+                  notify('CSLoL Manager updated!', true);
+                } else {
+                  setSetupStatus('error');
+                  setSetupMsg(`❌ ${r?.message || 'Failed'}`);
+                }
+              } catch (e: any) {
+                setSetupStatus('error');
+                setSetupMsg(`❌ ${e.message}`);
+              }
+            }} className="btn-outline" style={{ marginTop: 8 }}>
               Reinstall / Update
             </button>
           )}
