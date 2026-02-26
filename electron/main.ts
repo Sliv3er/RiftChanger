@@ -58,27 +58,27 @@ function createWindow() {
 
 function initServices() {
   const ud = app.getPath('userData');
+  // App install directory — where the exe lives (e.g. AppData\Local\Programs\riftchanger)
+  const appDir = isDev ? path.join(__dirname, '..') : path.dirname(app.getPath('exe'));
   assetService = new AssetService(path.join(ud, 'cache'));
   gameDetector = new GameDetector();
   backupService = new BackupService(path.join(ud, 'backups'));
   skinGenerator = new SkinGenerator(LOL_SKINS_DIR);
   skinScanner = new SkinScanner();
-  injector = new InjectorService(ud);
+  injector = new InjectorService(appDir);
   setWadMakeConfig(ud);
 
   // Pass cslol-tools dir to generator — check multiple locations
-  let toolsDir = findCslolToolsDir(ud);
-  if (!toolsDir) {
-    // Check standalone CSLoL Manager locations
-    const standalones = [
-      path.join(process.env.USERPROFILE || '', 'Downloads', 'cslol-manager', 'cslol-tools'),
-      path.join(process.env.LOCALAPPDATA || '', 'cslol-manager', 'cslol-tools'),
-    ];
-    for (const sd of standalones) {
-      if (fs.existsSync(path.join(sd, 'mod-tools.exe'))) { toolsDir = sd; break; }
-    }
+  const toolsCandidates = [
+    path.join(appDir, 'cslol-manager', 'cslol-tools'),
+    path.join(appDir, 'cslol-manager', 'cslol-manager', 'cslol-tools'),
+    path.join(ud, 'cslol-manager', 'cslol-manager', 'cslol-tools'),
+    path.join(ud, 'cslol-manager', 'cslol-tools'),
+    path.join(process.env.USERPROFILE || '', 'Downloads', 'cslol-manager', 'cslol-tools'),
+  ];
+  for (const td of toolsCandidates) {
+    if (fs.existsSync(path.join(td, 'mod-tools.exe'))) { skinGenerator.setToolsDir(td); break; }
   }
-  if (toolsDir) skinGenerator.setToolsDir(toolsDir);
 
   fs.mkdirSync(LOL_SKINS_DIR, { recursive: true });
 }

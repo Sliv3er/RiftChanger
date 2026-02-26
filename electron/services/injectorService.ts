@@ -38,10 +38,13 @@ export class InjectorService {
 
   private findCslol(): boolean {
     const candidates = [
-      // Our bundled copy
+      // Next to the app exe (primary location)
       path.join(this.basePath, 'cslol-manager'),
-      // Nested (from GitHub release zip structure)  
+      // Nested (from GitHub release zip structure)
       path.join(this.basePath, 'cslol-manager', 'cslol-manager'),
+      // AppData\Roaming fallback
+      path.join(process.env.APPDATA || '', 'riftchanger', 'cslol-manager'),
+      path.join(process.env.APPDATA || '', 'riftchanger', 'cslol-manager', 'cslol-manager'),
       // User's standalone
       path.join(process.env.USERPROFILE || '', 'Downloads', 'cslol-manager'),
     ];
