@@ -87,21 +87,51 @@ export class InjectorService {
       fs.mkdirSync(dlDir, { recursive: true });
       
       const rel = await axios.get(CSLOL_RELEASES_API, { headers: { 'User-Agent': 'RiftChanger/1.0' }, timeout: 15000 });
-      const asset = rel.data.assets.find((a: any) => a.name.toLowerCase().includes('win') && a.name.endsWith('.zip'))
-                 || rel.data.assets.find((a: any) => a.name.endsWith('.zip'));
+      // Find Windows asset — could be .zip or .exe (self-extracting)
+      const asset = rel.data.assets.find((a: any) => a.name.toLowerCase().includes('win'))
+                 || rel.data.assets.find((a: any) => a.name.endsWith('.zip') || a.name.endsWith('.exe'));
       if (!asset) return { success: false, message: 'No CSLoL release found' };
       
       const dlPath = path.join(this.basePath, asset.name);
       const res = await axios.get(asset.browser_download_url, { 
         responseType: 'arraybuffer', 
         headers: { 'User-Agent': 'RiftChanger/1.0' }, 
-        timeout: 120000, 
+        timeout: 300000, 
         maxContentLength: 500 * 1024 * 1024 
       });
       fs.writeFileSync(dlPath, Buffer.from(res.data));
       
-      const zip = new AdmZip(dlPath);
-      zip.extractAllTo(dlDir, true);
+      if (asset.name.endsWith('.zip')) {
+        const zip = new AdmZip(dlPath);
+        zip.extractAllTo(dlDir, true);
+      } else if (asset.name.endsWith('.exe')) {
+        // Self-extracting exe — run it silently to extract
+        // First try running it with /S (NSIS silent) or just copy and run
+        const { execFileSync: efs } = require('child_process');
+        try {
+          // CSLoL Manager exe is a self-extracting 7z or just the app itself
+          // Check if it's an installer or the actual app
+          const exeSize = fs.statSync(dlPath).size;
+          if (exeSize > 20 * 1024 * 1024) {
+            // It's the actual cslol-manager.exe (36MB) — just place it directly
+            fs.mkdirSync(dlDir, { recursive: true });
+            fs.copyFileSync(dlPath, path.join(dlDir, 'cslol-manager.exe'));
+            // We still need cslol-tools — download separately or extract from the exe
+            // Try running the exe to see if it self-extracts cslol-tools on first run
+            // For now, check if there's a cslol-tools release or if the exe contains it
+            // The cslol-manager.exe bundles everything — run it once to extract cslol-tools
+            try {
+              const proc = require('child_process').spawn(path.join(dlDir, 'cslol-manager.exe'), [], {
+                cwd: dlDir, windowsHide: true, stdio: 'ignore', detached: true
+              });
+              // Wait for it to create cslol-tools
+              await new Promise(r => setTimeout(r, 5000));
+              try { proc.kill(); } catch {}
+              try { efs('taskkill', ['/F', '/IM', 'cslol-manager.exe'], { windowsHide: true }); } catch {}
+            } catch {}
+          }
+        } catch {}
+      }
       try { fs.unlinkSync(dlPath); } catch {}
       
       if (this.findCslol()) {
