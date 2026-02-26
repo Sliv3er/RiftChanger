@@ -9,13 +9,23 @@ export default function Settings({ notify, onRescan }: Props) {
   const [overlay, setOverlay] = useState<{ running: boolean; log: string }>({ running: false, log: '' });
   const [setupStatus, setSetupStatus] = useState<'idle' | 'downloading' | 'done' | 'error'>('idle');
   const [setupMsg, setSetupMsg] = useState('');
+  const [setupPct, setSetupPct] = useState(0);
+  const [cslolVersion, setCslolVersion] = useState('');
 
   useEffect(() => {
     if (!window.api) return;
     window.api.injectorReady().then(setReady);
+    window.api.injectorStatusInfo().then(info => {
+      setReady(info.ready);
+      if (info.version) setCslolVersion(info.version);
+    });
     window.api.listMods().then(setMods);
     window.api.getSkinsPath().then(setSkinPath);
     window.api.overlayStatus().then(setOverlay);
+    window.api.onInjectorSetupProgress((d) => {
+      setSetupPct(d.pct);
+      setSetupMsg(d.msg);
+    });
     const timer = setInterval(() => {
       window.api.overlayStatus().then(setOverlay);
       window.api.listMods().then(setMods);
@@ -90,7 +100,7 @@ export default function Settings({ notify, onRescan }: Props) {
           <div className="flex items-center gap-2 mb-3">
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: ready ? '#0ACE83' : '#C24B4B' }} />
             <span style={{ fontSize: 12, color: '#F0E6D2' }}>
-              {ready ? 'CSLoL Manager ready' : 'Not installed'}
+              {ready ? `CSLoL Manager ready${cslolVersion ? ` (${cslolVersion})` : ''}` : 'Not installed'}
             </span>
           </div>
 
@@ -113,7 +123,7 @@ export default function Settings({ notify, onRescan }: Props) {
                 <span style={{ fontSize: 11, color: '#C8AA6E' }}>{setupMsg}</span>
               </div>
               <div className="lol-progress">
-                <div className="lol-progress-fill" style={{ width: '60%', animation: 'shimmer 1.5s infinite' }} />
+                <div className="lol-progress-fill" style={{ width: `${setupPct || 10}%`, transition: 'width 0.3s', animation: 'shimmer 1.5s infinite' }} />
               </div>
             </div>
           )}

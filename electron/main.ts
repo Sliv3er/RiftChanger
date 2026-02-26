@@ -101,7 +101,12 @@ function registerIPC() {
 
   // Injector
   ipcMain.handle('injector:isReady', () => injector.isReady());
-  ipcMain.handle('injector:setup', (_e, force?: boolean) => injector.setup(force));
+  ipcMain.handle('injector:status-info', () => injector.getStatus());
+  ipcMain.handle('injector:setup', (_e, force?: boolean) => {
+    return injector.setup(force, (pct, msg) => {
+      mainWindow?.webContents.send('injector:setupProgress', { pct, msg });
+    });
+  });
   ipcMain.handle('injector:setupFromPath', (_e, p: string) => injector.setupFromPath(p));
   ipcMain.handle('injector:import', (_e, zipPath: string, modName: string) => injector.importMod(zipPath, modName));
   ipcMain.handle('injector:apply', (_e, modNames?: string[]) => injector.apply(modNames));
