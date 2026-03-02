@@ -169,16 +169,36 @@ function registerIPC() {
 
   ipcMain.handle('scanSkinsFolder', (_e, p: string) => {
     try {
-      if (!fs.existsSync(p)) return { success: false };
-      // Check if it's a cslol-tools path (has mod-tools.exe)
-      if (fs.existsSync(path.join(p, 'mod-tools.exe'))) return { success: true };
-      // Check one level down
-      for (const sub of ['cslol-tools']) {
-        if (fs.existsSync(path.join(p, sub, 'mod-tools.exe'))) return { success: true };
-      }
+      if (!p || !fs.existsSync(p)) return { success: false };
+      
+      // Check if p itself is the tools folder
+      if (fs.existsSync(path.join(p, 'mod-tools.exe'))) return { success: true, path: p };
+      
+      // Check for common subdirs recursively (depth 2)
+      const check = (base: string, depth: number): string | null => {
+        if (depth > 2) return null;
+        try {
+          const entries = fs.readdirSync(base, { withFileTypes: true });
+          for (const e of entries) {
+            if (e.isDirectory()) {
+              const full = path.join(base, e.name);
+              if (fs.existsSync(path.join(full, 'mod-tools.exe'))) return full;
+              const res = check(full, depth + 1);
+              if (res) return res;
+            }
+          }
+        } catch {}
+        return null;
+      };
+
+      const found = check(p, 0);
+      if (found) return { success: true, path: found };
+
       // Check if it's a skins folder
       const dirs = fs.readdirSync(p, { withFileTypes: true }).filter(d => d.isDirectory());
-      if (dirs.length > 0) return { success: true, champions: Object.fromEntries(dirs.map(d => [d.name, true])) };
+      if (dirs.length > 5 && dirs.some(d => ['Aatrox', 'Ahri', 'Lux', 'Ezreal'].includes(d.name))) {
+        return { success: true, champions: Object.fromEntries(dirs.map(d => [d.name, true])) };
+      }
       return { success: false };
     } catch { return { success: false }; }
   });

@@ -11,8 +11,16 @@ export default function Settings({ notify, onRescan, onToolsChanged }: Props) {
   const [dlStatus, setDlStatus] = useState<Record<string, string>>({});
 
   const checkTools = useCallback(async () => {
-    try { const a = await window.api.checkToolsAvailability(); setToolsAvail(a); onToolsChanged?.(); } catch {}
-  }, [onToolsChanged]);
+    try { 
+      const a = await window.api.checkToolsAvailability(); 
+      setToolsAvail(a); 
+      if (a['cslol-manager'] && a.path && !settings.cslolToolsPath) {
+        setSettings(p => ({ ...p, cslolToolsPath: a.path! }));
+        await window.api.updateSetting('cslolToolsPath', a.path!);
+      }
+      onToolsChanged?.(); 
+    } catch {}
+  }, [onToolsChanged, settings.cslolToolsPath]);
 
   useEffect(() => {
     (async () => {
@@ -61,10 +69,15 @@ export default function Settings({ notify, onRescan, onToolsChanged }: Props) {
         const r = await window.api.testLeaguePath(path);
         setTestResults(p => ({ ...p, [type]: { success: r.success, message: r.success ? 'League of Legends game path is valid' : 'League of Legends.exe not found' } }));
       } else if (type === 'cslolTools') {
-        // Check if mod-tools.exe exists in path or subdir
-        const avail = await window.api.checkToolsAvailability();
-        setToolsAvail(avail);
-        setTestResults(p => ({ ...p, [type]: { success: !!avail['cslol-manager'], message: avail['cslol-manager'] ? 'CSLoL Tools path is valid' : 'mod-tools.exe not found in specified path' } }));
+        const r = await window.api.scanSkinsFolder(path);
+        if (r.success && r.path) {
+          if (r.path !== path) {
+            handleChange('cslolToolsPath', r.path);
+          }
+          setTestResults(p => ({ ...p, [type]: { success: true, message: 'CSLoL Tools path is valid' } }));
+        } else {
+          setTestResults(p => ({ ...p, [type]: { success: false, message: 'mod-tools.exe not found in specified path' } }));
+        }
       }
     } catch {}
   };

@@ -117,7 +117,7 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
     return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
   }, [expandedChroma]);
 
-  const normalizeName = (s: string) => s?.toLowerCase().replace(/['"\\\/]/g, '').replace(/\s+/g, ' ').trim() || '';
+  const normalizeName = (s: string) => s?.toLowerCase().replace(/['"\\/]/g, '').replace(/\s+/g, ' ').trim() || '';
 
   const findSkinFileForSkin = (skinName: string): SkinFile | null => {
     const norm = normalizeName(skinName);
@@ -133,20 +133,17 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
     finally { setApplying(false); }
   }, [selectedChamp, onApply]);
 
-  // ─── CHAMPION GRID (matches Rift exactly) ───
+  // Champion Grid View
   if (!selectedChamp) {
     return (
       <div className="w-full text-white flex flex-col relative"
         style={{ height: 'calc(100vh - 32px - 36px)', background: 'linear-gradient(135deg, #0a0e13 0%, #1e2328 50%, #0a0e13 100%)' }}>
-        {/* Background image */}
         <div className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: 'url(https://cdna.artstation.com/p/assets/images/images/018/338/344/large/alex-flores-godkingdarius-alexflores.jpg)', opacity: 0.25, filter: 'blur(0.5px)' }} />
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/35 to-black/60" />
-        {/* Gold accent line */}
         <div className="absolute top-0 left-0 right-0 h-1"
           style={{ background: 'linear-gradient(90deg, transparent 0%, #c89b3c 20%, #f0e6d2 50%, #c89b3c 80%, transparent 100%)', boxShadow: '0 0 10px rgba(200, 155, 60, 0.4)' }} />
 
-        {/* Header */}
         <div className="relative z-10 flex-shrink-0 py-4">
           <div className="text-center mb-4">
             <h1 className="text-3xl font-bold tracking-wide"
@@ -155,10 +152,8 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
             </h1>
           </div>
 
-          {/* Controls */}
           <div className="px-6">
             <div className="flex items-center justify-between max-w-5xl mx-auto">
-              {/* Role buttons */}
               <div className="flex items-center space-x-2">
                 {ROLES.map(r => (
                   <button key={r} onClick={() => setRoleFilter(r)}
@@ -176,20 +171,15 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
                 ))}
               </div>
 
-              {/* Search */}
               <div className="relative">
                 <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)}
                   className="px-3 py-2 pr-8 text-xs rounded-lg focus:outline-none transition-shadow w-40"
                   style={{ background: 'rgba(15, 20, 25, 0.95)', border: '1px solid rgba(200, 155, 60, 0.3)', color: '#f0e6d2' }} />
-                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-yellow-500 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Champion Grid */}
         <div className="electron-scroll" style={{ position: 'absolute', top: '180px', left: '20px', right: '20px', bottom: '20px', overflowY: 'scroll', padding: '20px', zIndex: 20 }}>
           <div className="grid grid-cols-8 gap-3 max-w-5xl mx-auto pb-8">
             {filtered.map(c => (
@@ -200,8 +190,6 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
                   <img src={`${DDRAGON}/cdn/${patch}/img/champion/${c.id}.png`} alt={c.name}
                     className="w-full h-full object-cover" loading="lazy"
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-all duration-300 pointer-events-none"
-                    style={{ background: 'linear-gradient(135deg, rgba(200, 155, 60, 0.6) 0%, rgba(240, 230, 210, 0.4) 100%)' }} />
                 </div>
                 <p className="text-xs text-center mt-2 font-medium w-full truncate text-gray-200 transition-colors group-hover:text-gold-300">{c.name}</p>
                 {appliedMods[c.name] && (
@@ -215,7 +203,7 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
     );
   }
 
-  // ─── CHAMPION DETAIL (matches Rift exactly) ───
+  // Champion Detail View
   const appliedSkin = appliedMods[selectedChamp.name];
   const skinName = selectedSkin?.name === 'default' ? 'Classic' : (selectedSkin?.name || 'Classic');
   const skinNum = selectedSkin?.num || 0;
@@ -224,11 +212,10 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
   const hasAnyApplied = !!appliedSkin;
   const skinsPerPage = 5;
   const visibleSkins = selectedChamp.skins.slice(skinPageIndex * skinsPerPage, (skinPageIndex + 1) * skinsPerPage);
-  const hasChromas = chromaFiles.length > 0 && skinName !== 'Classic';
 
   return (
-    <div className="absolute inset-0 bg-black text-white">
-      {/* Full splash background */}
+    <div className="absolute inset-0 bg-black text-white overflow-hidden">
+      {/* Splash background */}
       <div className="absolute inset-0">
         <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skinNum}.jpg`} alt="" className="w-full h-full object-cover"
           onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
@@ -244,130 +231,91 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
         </button>
       </div>
 
-      {/* Center champion display */}
-      <div className="relative z-10 h-full flex items-center justify-center pb-40">
-        <div className="text-center">
-          {/* Large circular portrait with golden ring */}
-          <div className="relative w-96 h-96 mx-auto mb-2">
-            <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #fbbf24, #f59e0b, #fbbf24, #f59e0b, #fbbf24)', padding: '4px' }}>
-              <div className="w-full h-full rounded-full overflow-hidden bg-black">
-                <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skinNum}.jpg`} alt={skinName} className="w-full h-full object-cover"
-                  onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
-              </div>
-            </div>
-            <div className="absolute inset-2 rounded-full border border-gold-400/40" />
-            {/* Tick marks */}
-            <div className="absolute inset-0">
-              {[...Array(72)].map((_, i) => (
-                <div key={i} className={`absolute ${i % 6 === 0 ? 'w-1 h-6 bg-gold-400' : 'w-0.5 h-3 bg-gold-400/60'}`}
-                  style={{ top: '-12px', left: '50%', transformOrigin: '50% 204px', transform: `translateX(-50%) rotate(${i * 5}deg)` }} />
-              ))}
+      {/* Center display */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center pb-40">
+        <div className="relative w-96 h-96 mb-4">
+          <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #fbbf24, #f59e0b, #fbbf24, #f59e0b, #fbbf24)', padding: '4px' }}>
+            <div className="w-full h-full rounded-full overflow-hidden bg-black">
+              <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skinNum}.jpg`} alt={skinName} className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
             </div>
           </div>
-
-          {/* Skin name */}
-          <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">{skinName}</h1>
-
-          {/* Progress dots */}
-          <div className="flex justify-center space-x-2 mb-1">
-            {selectedChamp.skins.map((skin: SkinData) => (
-              <div key={skin.id} onClick={() => { setSelectedSkin(skin); setExpandedChroma(null); }}
-                className={`w-3 h-3 rounded-full transition-all cursor-pointer hover:scale-110 ${selectedSkin?.id === skin.id ? 'bg-gold-400 scale-125' : 'bg-gray-500 hover:bg-gray-400'}`} />
+          <div className="absolute inset-0">
+            {[...Array(72)].map((_, i) => (
+              <div key={i} className={`absolute ${i % 6 === 0 ? 'w-1 h-6 bg-gold-400' : 'w-0.5 h-3 bg-gold-400/60'}`}
+                style={{ top: '-12px', left: '50%', transformOrigin: '50% 204px', transform: `translateX(-50%) rotate(${i * 5}deg)` }} />
             ))}
           </div>
         </div>
+        <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg text-center">{skinName}</h1>
+        <div className="flex justify-center space-x-2">
+          {selectedChamp.skins.map((skin: any) => (
+            <div key={skin.id} onClick={() => { setSelectedSkin(skin); setExpandedChroma(null); }}
+              className={`w-3 h-3 rounded-full transition-all cursor-pointer hover:scale-110 ${selectedSkin?.id === skin.id ? 'bg-gold-400 scale-125' : 'bg-gray-500 hover:bg-gray-400'}`} />
+          ))}
+        </div>
       </div>
 
-      {/* Apply / Remove button */}
-      <div className="absolute z-20" style={{ left: '50%', transform: 'translateX(-50%)', bottom: '80px' }}>
+      {/* Center Action Button */}
+      <div className="absolute z-20" style={{ left: '50%', transform: 'translateX(-50%)', bottom: '220px' }}>
         {!hasAnyApplied && skinName !== 'Classic' && skinFile && (
           applying ? (
-            <div className="w-40 h-40 flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+            <div className="w-32 h-32 flex items-center justify-center">
+              <div className="w-10 h-10 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
             <button onClick={() => handleApply(skinFile.path, skinName)}
-              className="w-40 h-16 rounded-lg font-bold text-lg tracking-wider transition-all hover:scale-110 active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #C89B3C 0%, #b8862b 50%, #9a6d1f 100%)', color: '#010A13', boxShadow: '0 4px 20px rgba(200,155,60,0.5)' }}>
+              className="w-32 h-32 rounded-full font-bold text-xs tracking-widest transition-all hover:scale-110 active:scale-95 flex flex-col items-center justify-center border-4 border-gold-400 shadow-[0_0_20px_rgba(200,170,110,0.5)] bg-black/40 backdrop-blur-sm"
+              style={{ color: '#C8AA6E' }}>
+              <span className="text-3xl mb-1">🔒</span>
               LOCK IN
             </button>
           )
         )}
         {isApplied && (
           <button onClick={() => onRemove(selectedChamp.name)}
-            className="w-40 h-16 rounded-lg font-bold text-lg tracking-wider transition-all hover:scale-110 active:scale-95"
-            style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', boxShadow: '0 4px 20px rgba(220,38,38,0.5)' }}>
+            className="w-32 h-32 rounded-full font-bold text-xs tracking-widest transition-all hover:scale-110 active:scale-95 flex flex-col items-center justify-center border-4 border-red-500 shadow-[0_0_20px_rgba(232,64,87,0.5)] bg-black/40 backdrop-blur-sm"
+            style={{ color: '#fff' }}>
+            <span className="text-3xl mb-1">🔓</span>
             REMOVE
           </button>
         )}
-        {!hasAnyApplied && skinName !== 'Classic' && !skinFile && (
-          <div className="text-gray-400 text-sm">Skin file not found in library</div>
-        )}
       </div>
 
-      {/* Bottom skin strip */}
+      {/* Bottom strip */}
       <div className="absolute bottom-0 left-0 right-0 z-30" style={{ height: '140px' }}>
         <div className="flex items-center justify-center py-4 px-8 space-x-6 h-full">
-          {/* Left arrow */}
           <button onClick={() => setSkinPageIndex(Math.max(0, skinPageIndex - 1))}
             className={`w-10 h-10 flex items-center justify-center rounded-full border-2 transition-all ${skinPageIndex > 0 ? 'border-gold-400 text-gold-400 hover:bg-gold-400/20' : 'border-gray-600 text-gray-600 cursor-not-allowed'}`}
-            disabled={skinPageIndex === 0}>
-            <span className="text-xl">‹</span>
-          </button>
-
-          {/* Skin cards */}
+            disabled={skinPageIndex === 0}>‹</button>
           <div className="flex space-x-4">
-            {visibleSkins.map((skin: SkinData) => {
+            {visibleSkins.map((skin: any) => {
               const isSelected = selectedSkin?.id === skin.id;
               const sName = skin.name === 'default' ? 'Classic' : skin.name;
               const isThisApplied = appliedSkin?.skinName === sName;
-              const skinChromas = chromaFiles.length > 0 && sName !== 'Classic' && isSelected;
-
               return (
                 <div key={skin.id} className="relative">
                   <div onClick={() => { setSelectedSkin(skin); setExpandedChroma(null); }}
                     className={`relative w-24 h-28 cursor-pointer transition-all duration-300 ${hasAnyApplied && !isThisApplied ? 'opacity-60' : ''} ${isSelected ? 'transform scale-110' : 'hover:scale-105'}`}>
-                    {isThisApplied && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/20 via-transparent to-transparent rounded z-10">
-                        <div className="absolute top-1 right-1 w-3 h-3 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50" />
-                      </div>
-                    )}
-                    <div className={`absolute inset-0 rounded ${isThisApplied ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 p-1 shadow-lg shadow-emerald-500/30' : isSelected ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 p-1' : 'bg-gray-700 p-1'}`}>
+                    {isThisApplied && <div className="absolute top-1 right-1 w-3 h-3 bg-emerald-400 rounded-full shadow-lg z-20" />}
+                    <div className={`absolute inset-0 rounded ${isThisApplied ? 'bg-emerald-500 p-1' : isSelected ? 'bg-yellow-400 p-1' : 'bg-gray-700 p-1'}`}>
                       <div className="w-full h-full rounded overflow-hidden">
                         <img src={`${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_${skin.num}.jpg`} alt={sName} className="w-full h-full object-cover"
                           onError={e => { (e.target as HTMLImageElement).src = `${DDRAGON}/cdn/img/champion/splash/${selectedChamp.id}_0.jpg`; }} />
                       </div>
                     </div>
-
-                    {/* Chroma button */}
-                    {skinChromas && !hasAnyApplied && (
+                    {isSelected && chromaFiles.length > 0 && sName !== 'Classic' && !hasAnyApplied && (
                       <button onClick={e => { e.stopPropagation(); setExpandedChroma(expandedChroma === skin.id ? null : skin.id); }}
-                        className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
-                        style={{ background: 'linear-gradient(135deg, #C89B3C, #f0e6d2)', color: '#010A13' }}>
-                        🎨
-                      </button>
+                        className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full bg-gold-500 text-black font-bold">🎨</button>
                     )}
                   </div>
-
-                  {/* Chroma selector popup */}
-                  {expandedChroma === skin.id && chromaFiles.length > 0 && (
-                    <div ref={chromaRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50">
-                      <div className="bg-black/80 backdrop-blur-sm border border-gray-500/50 rounded-lg p-3" style={{ minWidth: '240px' }}>
-                        <div className="flex justify-end mb-2">
-                          <button onClick={() => setExpandedChroma(null)} className="w-6 h-6 text-white hover:text-red-400 bg-black/60 rounded-full text-xs">✕</button>
-                        </div>
-                        <div className="flex flex-wrap gap-3 justify-center">
-                          {chromaFiles.map((cf, i) => (
-                            <button key={i} onClick={() => { handleApply(cf.path, `${cf.name} (${sName})`); setExpandedChroma(null); }}
-                              className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-600 hover:border-gold-400 transition-all hover:scale-110"
-                              title={cf.name}>
-                              <div className="w-full h-full flex items-center justify-center text-[10px] text-center p-1"
-                                style={{ background: `hsl(${(i * 40) % 360}, 60%, 30%)`, color: '#f0e6d2' }}>
-                                {cf.name.slice(0, 20)}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
+                  {expandedChroma === skin.id && (
+                    <div ref={chromaRef} className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-black/90 border border-gold-500 p-3 rounded-lg min-w-[200px]">
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {chromaFiles.map((cf, i) => (
+                          <button key={i} onClick={() => { handleApply(cf.path, `${cf.name} (${sName})`); setExpandedChroma(null); }}
+                            className="w-12 h-12 rounded border border-gray-600 hover:border-gold-400 text-[8px] p-1 bg-gray-800 break-all">{cf.name}</button>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -375,13 +323,9 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
               );
             })}
           </div>
-
-          {/* Right arrow */}
           <button onClick={() => setSkinPageIndex(Math.min(Math.ceil(selectedChamp.skins.length / skinsPerPage) - 1, skinPageIndex + 1))}
             className={`w-10 h-10 flex items-center justify-center rounded-full border-2 transition-all ${(skinPageIndex + 1) * skinsPerPage < selectedChamp.skins.length ? 'border-gold-400 text-gold-400 hover:bg-gold-400/20' : 'border-gray-600 text-gray-600 cursor-not-allowed'}`}
-            disabled={(skinPageIndex + 1) * skinsPerPage >= selectedChamp.skins.length}>
-            <span className="text-xl">›</span>
-          </button>
+            disabled={(skinPageIndex + 1) * skinsPerPage >= selectedChamp.skins.length}>›</button>
         </div>
       </div>
     </div>

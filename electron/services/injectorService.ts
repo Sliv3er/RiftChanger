@@ -68,10 +68,10 @@ export class InjectorService {
     return !!this.modToolsExe && fs.existsSync(this.modToolsExe);
   }
 
-  checkToolsAvailability(): { 'cslol-manager': boolean; 'lol-skins': boolean } {
+  checkToolsAvailability(): { 'cslol-manager': boolean; 'lol-skins': boolean; path?: string } {
     const cslol = this.isReady();
     const lolSkins = fs.existsSync(path.join(this.basePath, 'lol-skins'));
-    return { 'cslol-manager': cslol, 'lol-skins': lolSkins };
+    return { 'cslol-manager': cslol, 'lol-skins': lolSkins, path: cslol ? this.toolsPath : undefined };
   }
 
   getToolsPath(): string { return this.toolsPath; }

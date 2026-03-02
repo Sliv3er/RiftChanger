@@ -155,7 +155,8 @@ export default function Generator({ notify, onDone }: Props) {
                   if (e.key === 'Escape') setShowDropdown(false);
                 }}
                 placeholder="Search champion..."
-                className="lol-search w-full" style={{ paddingLeft: 10 }}
+                className="input-field w-full !bg-[#010A13] !text-[#F0E6D2] placeholder:text-[#5B5A56] border border-[#C8AA6E88]"
+                style={{ paddingLeft: 10 }}
               />
               {/* Dropdown */}
               {showDropdown && filtered.length > 0 && (
