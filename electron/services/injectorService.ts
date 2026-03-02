@@ -199,16 +199,67 @@ export class InjectorService {
     }
 
     // Step 3: Run overlay
+    // Ensure config file exists (mod-tools expects it even if empty)
     const configPath = profilePath + '.config';
-    this.overlayProcess = spawn(this.modToolsExe, [
+    if (!fs.existsSync(configPath)) {
+      fs.writeFileSync(configPath, '');
+    }
+
+    const overlayArgs = [
       'runoverlay', profilePath, configPath,
-      `--game:${this.gamePath}`, '--opts:none'
-    ], { stdio: 'pipe', windowsHide: true, detached: false });
+      `--game:${this.gamePath}`
+    ];
+    console.log('[Injector] Starting overlay:', this.modToolsExe, overlayArgs.join(' '));
 
-    this.overlayProcess.on('error', () => {});
-    this.overlayProcess.on('close', () => { this.overlayProcess = null; });
+    this.overlayProcess = spawn(this.modToolsExe, overlayArgs, {
+      stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: false
+    });
 
-    return { success: true };
+    // Monitor for immediate failure with detailed logging
+    return new Promise((resolve) => {
+      let stdoutData = '';
+      let stderrData = '';
+
+      if (this.overlayProcess?.stdout) {
+        this.overlayProcess.stdout.on('data', d => {
+          const chunk = d.toString();
+          stdoutData += chunk;
+          console.log('[Injector][overlay stdout]', chunk.trim());
+        });
+      }
+      if (this.overlayProcess?.stderr) {
+        this.overlayProcess.stderr.on('data', d => {
+          const chunk = d.toString();
+          stderrData += chunk;
+          console.log('[Injector][overlay stderr]', chunk.trim());
+        });
+      }
+
+      const checkTimeout = setTimeout(() => {
+        if (this.overlayProcess?.exitCode !== null) {
+          const allOutput = (stdoutData + '\n' + stderrData).trim();
+          console.log('[Injector] Overlay exited early. Output:', allOutput);
+          this.overlayProcess = null;
+          resolve({ success: false, error: `Overlay exited: ${allOutput || 'Unknown error'}` });
+        } else {
+          console.log('[Injector] Overlay running (pid:', this.overlayProcess?.pid, ')');
+          resolve({ success: true });
+        }
+      }, 3000);
+
+      this.overlayProcess?.on('error', (err) => {
+        clearTimeout(checkTimeout);
+        console.log('[Injector] Overlay spawn error:', err.message);
+        resolve({ success: false, error: `Failed to start overlay: ${err.message}` });
+      });
+
+      this.overlayProcess?.on('close', (code) => {
+        console.log('[Injector] Overlay closed with code', code, 'stdout:', stdoutData.trim(), 'stderr:', stderrData.trim());
+        if (code !== 0 && code !== null) {
+          this.overlayProcess = null;
+        }
+      });
+    });
   }
 
   /** Remove a specific champion's skin */
@@ -238,11 +289,15 @@ export class InjectorService {
         ], 60000);
 
         const configPath = profilePath + '.config';
+        if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, '');
         this.overlayProcess = spawn(this.modToolsExe, [
           'runoverlay', profilePath, configPath,
-          `--game:${this.gamePath}`, '--opts:none'
+          `--game:${this.gamePath}`
         ], { stdio: 'pipe', windowsHide: true, detached: false });
-        this.overlayProcess.on('close', () => { this.overlayProcess = null; });
+        this.overlayProcess.on('close', (code) => {
+          console.log('[Injector] Overlay (rebuild) closed with code', code);
+          this.overlayProcess = null;
+        });
       } catch {}
     }
 

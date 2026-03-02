@@ -232,7 +232,7 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
       </div>
 
       {/* Center display */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center pb-40">
+      <div className="relative z-10 h-full flex flex-col items-center justify-center pb-20">
         <div className="relative w-96 h-96 mb-4">
           <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #fbbf24, #f59e0b, #fbbf24, #f59e0b, #fbbf24)', padding: '4px' }}>
             <div className="w-full h-full rounded-full overflow-hidden bg-black">
@@ -247,39 +247,52 @@ export default function Skins({ champions, patch, skinsPath, appliedMods, onAppl
             ))}
           </div>
         </div>
-        <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg text-center">{skinName}</h1>
+        <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg text-center" style={{ fontFamily: 'Beaufort', letterSpacing: '0.05em' }}>{skinName}</h1>
+        
+        {/* Action Button - LoL Champion Select Lock In Style */}
+        <div className="mb-8 h-14 flex items-center justify-center">
+          {!hasAnyApplied && skinName !== 'Classic' && skinFile && (
+            <button onClick={() => handleApply(skinFile.path, skinName)} disabled={applying}
+              className="group relative min-w-[280px] py-3 px-12 font-bold text-lg tracking-[0.15em] uppercase transition-all duration-200 hover:brightness-125 active:scale-[0.98] disabled:opacity-50 disabled:cursor-wait"
+              style={{
+                background: 'linear-gradient(180deg, #C89B3C 0%, #A07628 40%, #785A28 100%)',
+                border: '2px solid #C8AA6E',
+                color: '#FFFFFF',
+                boxShadow: '0 0 15px rgba(200, 155, 60, 0.4), inset 0 1px 0 rgba(240, 230, 210, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.3)',
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+              }}>
+              {applying ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>PATCHING...</span>
+                </div>
+              ) : (
+                <span>LOCK IN</span>
+              )}
+            </button>
+          )}
+          
+          {isApplied && (
+            <button onClick={() => onRemove(selectedChamp.name)}
+              className="group relative min-w-[280px] py-3 px-12 font-bold text-lg tracking-[0.15em] uppercase transition-all duration-200 hover:brightness-125 active:scale-[0.98]"
+              style={{
+                background: 'linear-gradient(180deg, #8B3A3A 0%, #6B2020 40%, #4A1515 100%)',
+                border: '2px solid #C24B4B',
+                color: '#FFFFFF',
+                boxShadow: '0 0 15px rgba(194, 75, 75, 0.4), inset 0 1px 0 rgba(255, 150, 150, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.3)',
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+              }}>
+              <span>REMOVE</span>
+            </button>
+          )}
+        </div>
+
         <div className="flex justify-center space-x-2">
           {selectedChamp.skins.map((skin: any) => (
             <div key={skin.id} onClick={() => { setSelectedSkin(skin); setExpandedChroma(null); }}
-              className={`w-3 h-3 rounded-full transition-all cursor-pointer hover:scale-110 ${selectedSkin?.id === skin.id ? 'bg-gold-400 scale-125' : 'bg-gray-500 hover:bg-gray-400'}`} />
+              className={`w-2.5 h-2.5 rotate-45 transition-all cursor-pointer border border-transparent hover:border-gold-400 ${selectedSkin?.id === skin.id ? 'bg-gold-400 scale-125 border-gold-200 shadow-[0_0_8px_rgba(200,170,110,0.6)]' : 'bg-[#5B5A56]'}`} />
           ))}
         </div>
-      </div>
-
-      {/* Center Action Button */}
-      <div className="absolute z-20" style={{ left: '50%', transform: 'translateX(-50%)', bottom: '220px' }}>
-        {!hasAnyApplied && skinName !== 'Classic' && skinFile && (
-          applying ? (
-            <div className="w-32 h-32 flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <button onClick={() => handleApply(skinFile.path, skinName)}
-              className="w-32 h-32 rounded-full font-bold text-xs tracking-widest transition-all hover:scale-110 active:scale-95 flex flex-col items-center justify-center border-4 border-gold-400 shadow-[0_0_20px_rgba(200,170,110,0.5)] bg-black/40 backdrop-blur-sm"
-              style={{ color: '#C8AA6E' }}>
-              <span className="text-3xl mb-1">🔒</span>
-              LOCK IN
-            </button>
-          )
-        )}
-        {isApplied && (
-          <button onClick={() => onRemove(selectedChamp.name)}
-            className="w-32 h-32 rounded-full font-bold text-xs tracking-widest transition-all hover:scale-110 active:scale-95 flex flex-col items-center justify-center border-4 border-red-500 shadow-[0_0_20px_rgba(232,64,87,0.5)] bg-black/40 backdrop-blur-sm"
-            style={{ color: '#fff' }}>
-            <span className="text-3xl mb-1">🔓</span>
-            REMOVE
-          </button>
-        )}
       </div>
 
       {/* Bottom strip */}
