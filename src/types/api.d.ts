@@ -49,9 +49,10 @@ interface ElectronAPI {
   selectFolder(): Promise<string | null>;
 
   // Tools
-  checkToolsAvailability(): Promise<Record<string, boolean>>;
+  checkToolsAvailability(): Promise<{ 'cslol-manager': boolean; 'lol-skins': boolean; path?: string }>;
   testLeaguePath(p: string): Promise<{ success: boolean }>;
   downloadRepository(repoType: string): Promise<{ success: boolean; error?: string }>;
+  scanSkinsFolder(path: string): Promise<{ success: boolean; path?: string; champions?: Record<string, boolean> }>;
 
   // Skin files
   findSkinFiles(folder: string, champ: string): Promise<{ success: boolean; skinFiles: SkinFile[] }>;

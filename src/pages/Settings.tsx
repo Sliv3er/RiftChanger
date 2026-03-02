@@ -4,7 +4,7 @@ interface Props { notify: (msg: string, ok?: boolean) => void; onRescan: () => v
 
 export default function Settings({ notify, onRescan, onToolsChanged }: Props) {
   const [settings, setSettings] = useState<Record<string, string>>({});
-  const [toolsAvail, setToolsAvail] = useState<Record<string, boolean>>({});
+  const [toolsAvail, setToolsAvail] = useState<any>({});
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string } | null>>({});
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const [dlProgress, setDlProgress] = useState<Record<string, number>>({});
