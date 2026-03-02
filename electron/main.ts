@@ -236,6 +236,7 @@ app.whenReady().then(() => {
   try { initServices(); console.log('[main] services initialized'); } catch (e) { console.error('[main] initServices failed:', e); }
   try { registerIPC(); console.log('[main] IPC registered'); } catch (e) { console.error('[main] registerIPC failed:', e); }
   createWindow();
+  injector.setMainWindow(mainWindow);
   console.log('[main] window created');
 });
 app.on('window-all-closed', () => app.quit());

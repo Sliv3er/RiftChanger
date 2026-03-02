@@ -59,4 +59,14 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('downloadProgress', handler);
     return () => ipcRenderer.removeListener('downloadProgress', handler);
   },
+
+  // Overlay status
+  onOverlayStatus: (cb: (data: { msg: string; ok: boolean }) => void) => {
+    const handler = (_e: any, d: any) => cb(d);
+    ipcRenderer.on('overlay-status', handler);
+    return () => ipcRenderer.removeListener('overlay-status', handler);
+  },
+
+  // Scan skins folder
+  scanSkinsFolder: (p: string) => ipcRenderer.invoke('scanSkinsFolder', p),
 });

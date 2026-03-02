@@ -22,21 +22,22 @@ const CSLOL_LATEST_API = 'https://api.github.com/repos/LeagueToolkit/cslol-manag
 const SEVEN_ZIP = 'C:\\Program Files\\AMD\\AMDInstallManager\\7z.exe';
 
 export class InjectorService {
-  private basePath: string; // exe-relative dir
-  private toolsPath = '';   // cslol-tools dir containing mod-tools.exe
+  private basePath: string;
+  private toolsPath = '';
   private modToolsExe = '';
   private installedDir = '';
   private profilesDir = '';
   private gamePath = '';
   private appliedMods = new Map<string, AppliedMod>();
   private overlayProcess: ChildProcess | null = null;
+  private overlayWatcher: ReturnType<typeof setInterval> | null = null;
+  private mainWindow: any = null;
 
   constructor(basePath: string) {
     this.basePath = basePath;
     this.autoDetectTools();
   }
 
-  /** Auto-detect cslol-tools from exe-relative paths */
   private autoDetectTools(): boolean {
     const candidates = [
       path.join(this.basePath, 'cslol-manager', 'cslol-manager', 'cslol-tools'),
@@ -63,6 +64,85 @@ export class InjectorService {
   }
 
   setGamePath(p: string) { this.gamePath = p; }
+  setMainWindow(w: any) { this.mainWindow = w; }
+
+  private notifyRenderer(channel: string, data: any) {
+    try { this.mainWindow?.webContents?.send(channel, data); } catch {}
+  }
+
+  /** Check if League game process is running */
+  private isGameRunning(): boolean {
+    try {
+      const out = execSync('tasklist /FI "IMAGENAME eq League of Legends.exe" /NH', { windowsHide: true, timeout: 5000 }).toString();
+      return out.includes('League of Legends.exe');
+    } catch { return false; }
+  }
+
+  /**
+   * Start overlay watcher: polls every 3s for game process.
+   * When game detected, runs overlay. When overlay exits (game ends), keeps polling.
+   * This ensures the skin is applied whenever a game starts.
+   */
+  private startOverlayWatcher(profilePath: string) {
+    this.stopOverlayWatcher();
+
+    const configPath = profilePath + '.config';
+    if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, '');
+
+    let wasGameRunning = false;
+
+    const tryRunOverlay = () => {
+      // Don't spawn if overlay already running
+      if (this.overlayProcess && this.overlayProcess.exitCode === null) return;
+
+      const gameRunning = this.isGameRunning();
+
+      if (!gameRunning) {
+        if (wasGameRunning) {
+          console.log('[Injector] Game ended, waiting for next game...');
+          wasGameRunning = false;
+        }
+        return;
+      }
+
+      wasGameRunning = true;
+      console.log('[Injector] Game detected! Starting overlay...');
+      this.notifyRenderer('overlay-status', { msg: 'Game detected — injecting skin overlay...', ok: true });
+
+      this.overlayProcess = spawn(this.modToolsExe, [
+        'runoverlay', profilePath, configPath,
+        `--game:${this.gamePath}`, '--opts:none'
+      ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: false });
+
+      let stdout = '', stderr = '';
+      this.overlayProcess.stdout?.on('data', (d: Buffer) => {
+        const s = d.toString().trim();
+        stdout += s + '\n';
+        console.log('[Injector][overlay]', s);
+      });
+      this.overlayProcess.stderr?.on('data', (d: Buffer) => {
+        const s = d.toString().trim();
+        stderr += s + '\n';
+        console.log('[Injector][overlay err]', s);
+      });
+      this.overlayProcess.on('close', (code) => {
+        console.log('[Injector] Overlay exited code:', code);
+        this.overlayProcess = null;
+        // Watcher will retry on next tick
+      });
+    };
+
+    // Run immediately, then poll every 3 seconds
+    tryRunOverlay();
+    this.overlayWatcher = setInterval(tryRunOverlay, 3000);
+  }
+
+  private stopOverlayWatcher() {
+    if (this.overlayWatcher) {
+      clearInterval(this.overlayWatcher);
+      this.overlayWatcher = null;
+    }
+  }
 
   isReady(): boolean {
     return !!this.modToolsExe && fs.existsSync(this.modToolsExe);
@@ -76,7 +156,6 @@ export class InjectorService {
 
   getToolsPath(): string { return this.toolsPath; }
 
-  /** Test if a path contains mod-tools.exe */
   testToolsPath(p: string): boolean {
     const candidates = [p, path.join(p, 'cslol-tools')];
     for (const c of candidates) {
@@ -85,12 +164,10 @@ export class InjectorService {
     return false;
   }
 
-  /** Test if league game path is valid */
   testLeaguePath(p: string): { success: boolean } {
     return { success: fs.existsSync(path.join(p, 'League of Legends.exe')) };
   }
 
-  /** Download latest cslol-manager from GitHub */
   async downloadCslol(onProgress?: (data: { progress: number; status: string; repoType: string }) => void): Promise<{ success: boolean; error?: string; suggestedPath?: string }> {
     try {
       onProgress?.({ progress: 5, status: 'starting', repoType: 'cslol-manager' });
@@ -126,7 +203,6 @@ export class InjectorService {
       if (fs.existsSync(destDir)) fs.rmSync(destDir, { recursive: true, force: true });
       fs.mkdirSync(destDir, { recursive: true });
 
-      // Extract 7z SFX
       if (fs.existsSync(SEVEN_ZIP)) {
         try {
           execFileSync(SEVEN_ZIP, ['x', dlPath, `-o${destDir}`, '-y'], { timeout: 120000, windowsHide: true });
@@ -137,7 +213,6 @@ export class InjectorService {
 
       onProgress?.({ progress: 90, status: 'organizing', repoType: 'cslol-manager' });
 
-      // Find the cslol-tools dir in extracted content
       if (this.autoDetectTools()) {
         onProgress?.({ progress: 100, status: 'completed', repoType: 'cslol-manager' });
         return { success: true, suggestedPath: this.toolsPath };
@@ -149,7 +224,7 @@ export class InjectorService {
     }
   }
 
-  /** Inject a skin — matches Rift's inject-skin handler exactly */
+  /** Inject a skin: import → mkoverlay → start watcher that runs overlay when game detected */
   async injectSkin(championName: string, skinName: string, skinPath: string): Promise<{ success: boolean; error?: string }> {
     if (!this.isReady()) return { success: false, error: 'CSLoL Tools not configured. Go to Settings.' };
     if (!this.gamePath) return { success: false, error: 'League game path not configured.' };
@@ -162,7 +237,6 @@ export class InjectorService {
     const modName = path.basename(skinPath).replace(/\.(zip|fantome|wad\.client)$/i, '').replace(/[^a-zA-Z0-9_\-. ]/g, '_');
     const modInstallPath = path.join(this.installedDir, modName);
 
-    // Dynamic timeout
     const stats = fs.statSync(skinPath);
     const sizeMB = stats.size / (1024 * 1024);
     let timeout = 45000;
@@ -183,7 +257,7 @@ export class InjectorService {
       championName, skinName, appliedAt: new Date().toISOString(), zipPath: skinPath
     });
 
-    // Step 2: Unified overlay
+    // Step 2: Build overlay
     const allModNames = Array.from(this.appliedMods.values()).map(m => m.name);
     const profilePath = path.join(this.profilesDir, 'RiftChanger_Unified');
 
@@ -195,79 +269,18 @@ export class InjectorService {
       ], timeout);
     } catch (e: any) {
       this.appliedMods.delete(skinPath);
-      return { success: false, error: `Overlay failed: ${e.message}` };
+      return { success: false, error: `Overlay build failed: ${e.message}` };
     }
 
-    // Step 3: Run overlay
-    // Ensure config file exists (mod-tools expects it even if empty)
-    const configPath = profilePath + '.config';
-    if (!fs.existsSync(configPath)) {
-      fs.writeFileSync(configPath, '');
-    }
+    // Step 3: Start watcher — it polls for game and runs overlay when detected
+    this.startOverlayWatcher(profilePath);
 
-    const overlayArgs = [
-      'runoverlay', profilePath, configPath,
-      `--game:${this.gamePath}`
-    ];
-    console.log('[Injector] Starting overlay:', this.modToolsExe, overlayArgs.join(' '));
-
-    this.overlayProcess = spawn(this.modToolsExe, overlayArgs, {
-      stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, detached: false
-    });
-
-    // Monitor for immediate failure with detailed logging
-    return new Promise((resolve) => {
-      let stdoutData = '';
-      let stderrData = '';
-
-      if (this.overlayProcess?.stdout) {
-        this.overlayProcess.stdout.on('data', d => {
-          const chunk = d.toString();
-          stdoutData += chunk;
-          console.log('[Injector][overlay stdout]', chunk.trim());
-        });
-      }
-      if (this.overlayProcess?.stderr) {
-        this.overlayProcess.stderr.on('data', d => {
-          const chunk = d.toString();
-          stderrData += chunk;
-          console.log('[Injector][overlay stderr]', chunk.trim());
-        });
-      }
-
-      const checkTimeout = setTimeout(() => {
-        if (this.overlayProcess?.exitCode !== null) {
-          const allOutput = (stdoutData + '\n' + stderrData).trim();
-          console.log('[Injector] Overlay exited early. Output:', allOutput);
-          this.overlayProcess = null;
-          resolve({ success: false, error: `Overlay exited: ${allOutput || 'Unknown error'}` });
-        } else {
-          console.log('[Injector] Overlay running (pid:', this.overlayProcess?.pid, ')');
-          resolve({ success: true });
-        }
-      }, 3000);
-
-      this.overlayProcess?.on('error', (err) => {
-        clearTimeout(checkTimeout);
-        console.log('[Injector] Overlay spawn error:', err.message);
-        resolve({ success: false, error: `Failed to start overlay: ${err.message}` });
-      });
-
-      this.overlayProcess?.on('close', (code) => {
-        console.log('[Injector] Overlay closed with code', code, 'stdout:', stdoutData.trim(), 'stderr:', stderrData.trim());
-        if (code !== 0 && code !== null) {
-          this.overlayProcess = null;
-        }
-      });
-    });
+    return { success: true };
   }
 
-  /** Remove a specific champion's skin */
   async removeSkin(championName: string): Promise<{ success: boolean }> {
-    // Find and remove from applied mods
     for (const [key, mod] of this.appliedMods.entries()) {
       if (mod.championName === championName) {
-        // Remove installed dir
         try { fs.rmSync(mod.profilePath, { recursive: true, force: true }); } catch {}
         this.appliedMods.delete(key);
         break;
@@ -277,7 +290,7 @@ export class InjectorService {
     this.killOverlay();
     await new Promise(r => setTimeout(r, 500));
 
-    // Rebuild overlay if there are remaining mods
+    // Rebuild overlay if remaining mods exist
     if (this.appliedMods.size > 0) {
       const allModNames = Array.from(this.appliedMods.values()).map(m => m.name);
       const profilePath = path.join(this.profilesDir, 'RiftChanger_Unified');
@@ -288,30 +301,19 @@ export class InjectorService {
           '--noTFT', '--ignoreConflict'
         ], 60000);
 
-        const configPath = profilePath + '.config';
-        if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, '');
-        this.overlayProcess = spawn(this.modToolsExe, [
-          'runoverlay', profilePath, configPath,
-          `--game:${this.gamePath}`
-        ], { stdio: 'pipe', windowsHide: true, detached: false });
-        this.overlayProcess.on('close', (code) => {
-          console.log('[Injector] Overlay (rebuild) closed with code', code);
-          this.overlayProcess = null;
-        });
+        this.startOverlayWatcher(profilePath);
       } catch {}
     }
 
     return { success: true };
   }
 
-  /** Remove all skins */
   async removeAllSkins(): Promise<{ success: boolean }> {
     this.killOverlay();
-    for (const [key, mod] of this.appliedMods.entries()) {
+    for (const [, mod] of this.appliedMods.entries()) {
       try { fs.rmSync(mod.profilePath, { recursive: true, force: true }); } catch {}
     }
     this.appliedMods.clear();
-    // Clean profiles dir
     const profilePath = path.join(this.profilesDir, 'RiftChanger_Unified');
     try { fs.rmSync(profilePath, { recursive: true, force: true }); } catch {}
     try { fs.rmSync(profilePath + '.config', { force: true }); } catch {}
@@ -334,6 +336,7 @@ export class InjectorService {
   }
 
   killOverlay() {
+    this.stopOverlayWatcher();
     if (this.overlayProcess) {
       try { this.overlayProcess.kill(); } catch {}
       this.overlayProcess = null;
@@ -343,7 +346,6 @@ export class InjectorService {
 
   cleanup() {
     this.killOverlay();
-    // Remove all installed mods on exit
     for (const mod of this.appliedMods.values()) {
       try { fs.rmSync(mod.profilePath, { recursive: true, force: true }); } catch {}
     }
