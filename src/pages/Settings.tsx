@@ -69,11 +69,13 @@ export default function Settings({ notify, onRescan, onToolsChanged }: Props) {
         const r = await window.api.testLeaguePath(path);
         setTestResults(p => ({ ...p, [type]: { success: r.success, message: r.success ? 'League of Legends game path is valid' : 'League of Legends.exe not found' } }));
       } else if (type === 'cslolTools') {
-        const r = await window.api.scanSkinsFolder(path);
+        const r = await (window.api as any).testToolsPath?.(path) ?? await window.api.scanSkinsFolder(path);
         if (r.success && r.path) {
           if (r.path !== path) {
             handleChange('cslolToolsPath', r.path);
           }
+          setTestResults(p => ({ ...p, [type]: { success: true, message: 'CSLoL Tools path is valid' } }));
+        } else if (r.success) {
           setTestResults(p => ({ ...p, [type]: { success: true, message: 'CSLoL Tools path is valid' } }));
         } else {
           setTestResults(p => ({ ...p, [type]: { success: false, message: 'mod-tools.exe not found in specified path' } }));

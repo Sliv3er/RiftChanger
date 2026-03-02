@@ -116,6 +116,15 @@ function registerIPC() {
   // Tools availability
   ipcMain.handle('checkToolsAvailability', () => injector.checkToolsAvailability());
   ipcMain.handle('testLeaguePath', (_e, p: string) => injector.testLeaguePath(p));
+  ipcMain.handle('testToolsPath', (_e, p: string) => {
+    const candidates = [p, path.join(p, 'cslol-tools')];
+    for (const c of candidates) {
+      if (fs.existsSync(path.join(c, 'mod-tools.exe'))) {
+        return { success: true, path: c };
+      }
+    }
+    return { success: false };
+  });
 
   // Download cslol-manager
   ipcMain.handle('downloadRepository', async (_e, repoType: string) => {

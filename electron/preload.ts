@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   // Tools
   checkToolsAvailability: () => ipcRenderer.invoke('checkToolsAvailability'),
   testLeaguePath: (p: string) => ipcRenderer.invoke('testLeaguePath', p),
+  testToolsPath: (p: string) => ipcRenderer.invoke('testToolsPath', p),
   downloadRepository: (repoType: string) => ipcRenderer.invoke('downloadRepository', repoType),
 
   // Skin files
